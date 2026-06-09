@@ -1,0 +1,18 @@
+# OS
+.DS_Store
+**/.DS_Store
+
+# Secrets / env (belt-and-suspenders; subfolders also ignore these)
+**/.env
+**/.env.*
+*.pem
+
+# Service account credentials
+mesa-startup-lab-*.json
+
+# Dependencies / build
+**/node_modules/
+**/.next/
+**/venv/
+**/__pycache__/
+*.pyc

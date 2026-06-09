@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  markai-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: markai-backend
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    # Load all environment variables from .env
+    env_file:
+      - .env
+
+    # Override GCS path for Docker
+    environment:
+      - GCS_SERVICE_ACCOUNT_PATH=/app/credentials/gcs-service-account.json
+
+    volumes:
+      - ./mesa-startup-lab-ddbe5ec10dbc.json:/app/credentials/gcs-service-account.json:ro
+      - ./logs:/app/logs
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

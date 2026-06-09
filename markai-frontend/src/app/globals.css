@@ -1,0 +1,260 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Tailwind color tokens that adapt to theme */
+  --color-background: light-dark(255 255 255, 0 0 0);
+  --color-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-card: light-dark(255 255 255, 13 13 13);
+  --color-card-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-primary: 59 130 246;
+  --color-primary-foreground: light-dark(255 255 255, 0 0 0);
+
+  --color-secondary: light-dark(243 244 246, 26 26 26);
+  --color-secondary-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-muted: light-dark(243 244 246, 26 26 26);
+  --color-muted-foreground: light-dark(107 114 128, 156 163 175);
+
+  --color-accent: light-dark(243 244 246, 26 26 26);
+  --color-accent-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-destructive: 239 68 68;
+  --color-destructive-foreground: 255 255 255;
+
+  --color-border: light-dark(229 231 235, 38 38 38);
+  --color-input: light-dark(229 231 235, 38 38 38);
+  --color-ring: 59 130 246;
+}
+
+/* ==== Theme Variables ==== */
+:root {
+  /* Light theme colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-card: #ffffff;
+  --bg-accent: rgba(59, 130, 246, 0.05);
+
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-inverse: #ffffff;
+
+  --border-primary: rgba(0, 0, 0, 0.1);
+  --border-secondary: rgba(0, 0, 0, 0.05);
+
+  --accent-blue: #2f56e0;
+  --accent-blue-hover: #2546c4;
+  --accent-purple: #8b3de8;
+
+  /* ===== Brand palette (derived from the Mark AI logo) ===== */
+  --brand-blue: #2f56e0;
+  --brand-cyan: #1fc4cf;
+  --brand-green: #4fb84f;
+  --brand-purple: #8b3de8;
+  --brand-gradient: linear-gradient(120deg, #2f56e0 0%, #2b8fd9 52%, #19bccf 100%);
+  --brand-gradient-strong: linear-gradient(120deg, #2546c4 0%, #2380c4 52%, #14a6b6 100%);
+  /* cooler blue -> cyan ramp */
+  --brand-gradient-cool: linear-gradient(135deg, #2f56e0 0%, #1fc4cf 100%);
+  --brand-glow: rgba(47, 86, 224, 0.35);
+
+  /* ===== Glass surface (navbar / floating panels) ===== */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 12px 40px -12px rgba(17, 24, 39, 0.25), 0 2px 8px -2px rgba(17, 24, 39, 0.08);
+
+  --shadow-sm: rgba(0, 0, 0, 0.05);
+  --shadow-md: rgba(0, 0, 0, 0.1);
+  --shadow-lg: rgba(0, 0, 0, 0.15);
+  --sidebar: hsl(0 0% 98%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+  /* Dark theme colors */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-accent: rgba(59, 130, 246, 0.1);
+
+  --text-primary: #ffffff;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #000000;
+
+  --border-primary: rgba(255, 255, 255, 0.1);
+  --border-secondary: rgba(255, 255, 255, 0.05);
+
+  --accent-blue: #4f7dff;
+  --accent-blue-hover: #6f97ff;
+  --accent-purple: #a06cf2;
+
+  /* ===== Brand palette (dark) ===== */
+  --brand-blue: #4f7dff;
+  --brand-cyan: #2fd6e2;
+  --brand-green: #5fcf6b;
+  --brand-purple: #a06cf2;
+  --brand-gradient: linear-gradient(120deg, #4f7dff 0%, #36b0ec 52%, #2fd6e2 100%);
+  --brand-gradient-strong: linear-gradient(120deg, #3a66f0 0%, #2b9fdc 52%, #22c7d4 100%);
+  /* cooler blue -> cyan ramp */
+  --brand-gradient-cool: linear-gradient(135deg, #4f7dff 0%, #2fd6e2 100%);
+  --brand-glow: rgba(79, 125, 255, 0.45);
+
+  /* ===== Glass surface (dark) ===== */
+  --glass-bg: rgba(18, 20, 27, 0.55);
+  --glass-bg-strong: rgba(18, 20, 27, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+
+  --shadow-sm: rgba(0, 0, 0, 0.3);
+  --shadow-md: rgba(0, 0, 0, 0.5);
+  --shadow-lg: rgba(0, 0, 0, 0.7);
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.heading-font {
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+  letter-spacing: -0.02em;
+}
+
+.subheading-font {
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
+
+/* ==== Brand utilities (logo-derived) ==== */
+.brand-gradient-text {
+  background-image: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.brand-gradient-bg {
+  background-image: var(--brand-gradient);
+  color: #ffffff;
+}
+
+.brand-gradient-bg:hover {
+  background-image: var(--brand-gradient-strong);
+}
+
+.brand-gradient-bg-cool {
+  background-image: var(--brand-gradient-cool);
+  color: #ffffff;
+}
+
+.brand-gradient-text-cool {
+  background-image: var(--brand-gradient-cool);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.brand-ring {
+  box-shadow: 0 0 0 1px var(--brand-blue), 0 8px 24px -8px var(--brand-glow);
+}
+
+/* ==== Glass surface (navbar / floating panels) ==== */
+.glass-panel {
+  background-color: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-panel-strong {
+  background-color: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* ==== Scrollbar Base ==== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+/* ==== Scrollbar Track (background area) ==== */
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+/* ==== Scrollbar Thumb (the draggable part) ==== */
+::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 8px;
+  transition: background 0.3s ease;
+}
+
+/* ==== Hovered Thumb ==== */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* ==== Active Thumb (while dragging) ==== */
+::-webkit-scrollbar-thumb:active {
+  background: var(--text-primary);
+}
+
+/* ==== Corner of scrollbar (for two scrollbars meeting) ==== */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
