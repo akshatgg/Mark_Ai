@@ -1,0 +1,262 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./theme.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Tailwind color tokens that adapt to theme */
+  --color-background: light-dark(255 255 255, 0 0 0);
+  --color-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-card: light-dark(255 255 255, 13 13 13);
+  --color-card-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-primary: 59 130 246;
+  --color-primary-foreground: light-dark(255 255 255, 0 0 0);
+
+  --color-secondary: light-dark(243 244 246, 26 26 26);
+  --color-secondary-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-muted: light-dark(243 244 246, 26 26 26);
+  --color-muted-foreground: light-dark(107 114 128, 156 163 175);
+
+  --color-accent: light-dark(243 244 246, 26 26 26);
+  --color-accent-foreground: light-dark(17 24 39, 255 255 255);
+
+  --color-destructive: 239 68 68;
+  --color-destructive-foreground: 255 255 255;
+
+  --color-border: light-dark(229 231 235, 38 38 38);
+  --color-input: light-dark(229 231 235, 38 38 38);
+  --color-ring: 59 130 246;
+}
+
+/* ==== Legacy theme variable aliases — every value MUST resolve back to a token in theme.css ==== */
+/* Do not add new colors here; declare them in theme.css instead. */
+:root {
+  /* Legacy bg/text/border aliases pointing at theme.css tokens */
+  --bg-primary: var(--color-page-bg);
+  --bg-secondary: var(--color-page-bg-elevated);
+  --bg-tertiary: var(--color-surface-elev);
+  --bg-card: var(--color-surface);
+  --bg-accent: var(--color-info-soft);
+
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-muted);
+  --text-tertiary: var(--color-text-subtle);
+  --text-inverse: var(--color-text-inverse);
+
+  --border-primary: var(--color-border);
+  --border-secondary: var(--color-divider);
+
+  --accent-blue: var(--brand-blue);
+  --accent-blue-hover: var(--brand-blue-dark);
+  --accent-purple: var(--brand-blue); /* Legacy purple alias kept on-brand */
+
+  --brand-purple: var(--brand-blue); /* Legacy purple alias kept on-brand */
+  --brand-glow: var(--brand-glow-blue-soft);
+
+  --shadow-sm: rgba(0, 0, 0, 0.05);
+  --shadow-md: rgba(0, 0, 0, 0.1);
+  --shadow-lg: rgba(0, 0, 0, 0.15);
+  --sidebar: hsl(0 0% 98%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+  /* Dark mode legacy aliases — theme.css owns the underlying tokens */
+  --bg-accent: var(--color-info-soft);
+  --accent-blue: var(--brand-blue);
+  --accent-blue-hover: var(--brand-blue-dark);
+  --accent-purple: var(--brand-blue);
+  --brand-purple: var(--brand-blue);
+  --brand-glow: var(--brand-glow-blue);
+
+  --shadow-sm: rgba(0, 0, 0, 0.3);
+  --shadow-md: rgba(0, 0, 0, 0.5);
+  --shadow-lg: rgba(0, 0, 0, 0.7);
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.heading-font {
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+  letter-spacing: -0.02em;
+}
+
+.subheading-font {
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
+
+/* ==== Brand utilities (logo-derived) ==== */
+.brand-gradient-text {
+  background-image: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.brand-gradient-bg {
+  background-image: var(--brand-gradient);
+  color: var(--color-on-brand);
+}
+
+.brand-gradient-bg:hover {
+  background-image: var(--brand-gradient-strong);
+}
+
+.brand-gradient-bg-cool {
+  background-image: var(--brand-gradient-cool);
+  color: var(--color-on-brand);
+}
+
+.brand-gradient-text-cool {
+  background-image: var(--brand-gradient-cool);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.brand-ring {
+  box-shadow: 0 0 0 1px var(--brand-blue), 0 8px 24px -8px var(--brand-glow);
+}
+
+/* ==== Glass surface (navbar / floating panels) ==== */
+.glass-panel {
+  background-color: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-panel-strong {
+  background-color: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* ==== Theme-aware surface & text utilities ==== */
+/* Use these everywhere instead of hard-coded white / gray-* so light/dark themes both look correct. */
+
+/* All colors below resolve to tokens declared in theme.css — do NOT hardcode hex here. */
+.bg-base { background-color: var(--color-page-bg); }
+.bg-elev { background-color: var(--color-surface-elev); }
+.bg-surface { background-color: var(--color-surface); }
+
+.text-base { color: var(--color-text); }
+.text-muted { color: var(--color-text-muted); }
+.text-subtle { color: var(--color-text-subtle); }
+.text-faint { color: var(--color-text-faint); }
+
+.border-base { border-color: var(--color-border); }
+.border-subtle { border-color: var(--color-divider); }
+.border-strong { border-color: var(--color-border-strong); }
+
+.ring-base { box-shadow: 0 0 0 1px var(--color-border); }
+.divider-base { border-color: var(--color-divider); }
+
+/* ==== Scrollbar Base ==== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+/* ==== Scrollbar Track (background area) ==== */
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+/* ==== Scrollbar Thumb (the draggable part) ==== */
+::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 8px;
+  transition: background 0.3s ease;
+}
+
+/* ==== Hovered Thumb ==== */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* ==== Active Thumb (while dragging) ==== */
+::-webkit-scrollbar-thumb:active {
+  background: var(--text-primary);
+}
+
+/* ==== Corner of scrollbar (for two scrollbars meeting) ==== */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Hide scrollbar utility — content remains scrollable, scrollbar UI is hidden. */
+.no-scrollbar {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE / Edge legacy */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;                  /* WebKit */
+  width: 0;
+  height: 0;
+}
+
+/* Table primitive uses overflow-x-auto on its inner container — strip its scrollbar by default. */
+[data-slot="table-container"] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+[data-slot="table-container"]::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

@@ -1,0 +1,29 @@
+*{
+    padding: 0;
+    margin: 0;
+}
+
+body{
+    font-family: "Montserrat", serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #393152;
+}
+
+.server{
+    width: 45%;
+}
+
+h1{
+    color: #fff;
+    margin-top: 20px;
+}
+
+p{
+    color: #fff;
+    margin-top: 10px;
+    font-weight: 600;
+}

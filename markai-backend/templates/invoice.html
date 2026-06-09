@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Invoice - {{ invoice_id }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* A4 Page Setup */
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #1a1a1a;
+            background: #ffffff;
+            padding: 0;
+        }
+
+        .invoice-container {
+            max-width: 100%;
+            margin: 0;
+            background: #ffffff;
+        }
+
+        /* Header Section - Compact for A4 */
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #1a1a1a;
+        }
+
+        .company-info {
+            flex: 1;
+        }
+
+        .company-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 2px;
+            letter-spacing: -0.3px;
+        }
+
+        .company-tagline {
+            font-size: 10px;
+            color: #666666;
+            margin-bottom: 10px;
+        }
+
+        .invoice-type {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 3px;
+        }
+
+        .gst-registered {
+            font-size: 9px;
+            color: #059669;
+            font-weight: 600;
+            background: #d1fae5;
+            padding: 3px 8px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .logo-section {
+            text-align: right;
+        }
+
+        .logo-section img {
+            max-width: 120px;
+            height: auto;
+            margin-bottom: 8px;
+        }
+
+        .invoice-meta {
+            text-align: right;
+        }
+
+        .invoice-meta-item {
+            margin-bottom: 4px;
+            font-size: 10px;
+        }
+
+        .invoice-meta-label {
+            color: #666666;
+            font-weight: 500;
+        }
+
+        .invoice-meta-value {
+            color: #1a1a1a;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        /* Billing Section - Compact */
+        .billing-section {
+            margin-bottom: 18px;
+        }
+
+        .section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #666666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .billing-details {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #1a1a1a;
+        }
+
+        .company-name-billing {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .gstin {
+            font-size: 13px;
+            color: #666666;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .gstin-value {
+            color: #1a1a1a;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .address {
+            font-size: 13px;
+            color: #555555;
+            line-height: 1.7;
+        }
+
+        /* Booking Details Grid - Compact */
+        .booking-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .booking-card {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .booking-detail-row {
+            margin-bottom: 8px;
+        }
+
+        .booking-detail-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            font-size: 9px;
+            color: #666666;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .detail-value {
+            font-size: 11px;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-paid {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* Time Slots Table - Compact for A4 */
+        .time-slots-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 18px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            font-size: 10px;
+        }
+
+        .time-slots-table thead {
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+
+        .time-slots-table th {
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .time-slots-table th:first-child {
+            width: 60px;
+            text-align: center;
+        }
+
+        .time-slots-table tbody tr {
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .time-slots-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .time-slots-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .time-slots-table td {
+            padding: 8px 10px;
+            font-size: 10px;
+            color: #333333;
+        }
+
+        .time-slots-table td:first-child {
+            text-align: center;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+
+        /* Payment Summary - Compact */
+        .payment-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border: 2px solid #1a1a1a;
+            margin-bottom: 18px;
+            max-width: 350px;
+            margin-left: auto;
+        }
+
+        .payment-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 11px;
+        }
+
+        .payment-row:not(:last-child) {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .payment-label {
+            color: #666666;
+            font-weight: 500;
+        }
+
+        .payment-value {
+            color: #1a1a1a;
+            font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .payment-total {
+            background: #1a1a1a;
+            color: #ffffff;
+            padding: 10px 15px;
+            margin: -15px -15px 0 -15px;
+            border-radius: 0 0 4px 4px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .payment-total .payment-label {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .payment-total .payment-value {
+            color: #ffffff;
+            font-size: 14px;
+        }
+
+        /* Transaction Details */
+        .transaction-section {
+            margin-bottom: 35px;
+        }
+
+        .transaction-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .transaction-item {
+            background: #ffffff;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+
+        .transaction-label {
+            font-size: 12px;
+            color: #666666;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .transaction-value {
+            font-size: 13px;
+            color: #1a1a1a;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Footer - Compact */
+        .invoice-footer {
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #666666;
+            font-size: 9px;
+        }
+
+        .footer-note {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            color: #555555;
+            font-size: 9px;
+            line-height: 1.5;
+        }
+
+        /* Limit time slots to fit in page */
+        .time-slots-table tbody tr:nth-child(n+11) {
+            display: none;
+        }
+
+        .more-slots {
+            text-align: center;
+            padding: 8px;
+            background: #f8f9fa;
+            font-size: 9px;
+            color: #666;
+            font-style: italic;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                padding: 0;
+            }
+
+            .invoice-container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+
+        <!-- Header Section -->
+        <div class="invoice-header">
+            <div class="company-info">
+                <div class="company-name">MARK AI</div>
+                <div class="company-tagline">Digital Advertising Platform</div>
+                <div class="invoice-type">TAX INVOICE</div>
+                <span class="gst-registered">GST REGISTERED</span>
+            </div>
+
+            <div class="logo-section">
+                <img src="https://storage.googleapis.com/careers-crm-data/careers-data/Mark_AI_Logo_02_20260123_140835_d7399e6b.png" alt="Mark AI Logo">
+                <div class="invoice-meta">
+                    <div class="invoice-meta-item">
+                        <span class="invoice-meta-label">Invoice ID:</span>
+                        <span class="invoice-meta-value">{{ invoice_id }}</span>
+                    </div>
+                    <div class="invoice-meta-item">
+                        <span class="invoice-meta-label">Date:</span>
+                        <span class="invoice-meta-value">{{ invoice_date }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Billing Information -->
+        <div class="billing-section">
+            <div class="section-title">Billing Information</div>
+            <div class="billing-details">
+                <div class="company-name-billing">{{ billing_company_name }}</div>
+                {% if billing_gstin and billing_gstin != 'None' and billing_gstin != '' %}
+                <div class="gstin">
+                    GSTIN: <span class="gstin-value">{{ billing_gstin }}</span>
+                </div>
+                {% endif %}
+                {% if billing_address and billing_address != 'None' and billing_address != '' %}
+                <div class="address">
+                    {{ billing_address }}{% if billing_city %}, {{ billing_city }}{% endif %}{% if billing_state %}, {{ billing_state }}{% endif %}{% if billing_pincode %} - {{ billing_pincode }}{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Booking Details -->
+        <div class="section-title">Booking Details</div>
+        <div class="booking-grid">
+            <div class="booking-card">
+                <div class="booking-detail-row">
+                    <div class="detail-label">Screen Name</div>
+                    <div class="detail-value">{{ screen_name }}</div>
+                </div>
+                <div class="booking-detail-row">
+                    <div class="detail-label">Booking Type</div>
+                    <div class="detail-value">{{ booking_type }}</div>
+                </div>
+                <div class="booking-detail-row">
+                    <div class="detail-label">Start Date</div>
+                    <div class="detail-value">{{ start_date }}</div>
+                </div>
+                <div class="booking-detail-row">
+                    <div class="detail-label">End Date</div>
+                    <div class="detail-value">{{ end_date }}</div>
+                </div>
+            </div>
+
+            <div class="booking-card">
+                <div class="booking-detail-row">
+                    <div class="detail-label">Payment Status</div>
+                    <div class="detail-value">
+                        <span class="status-badge {% if payment_status == 'paid' %}status-paid{% else %}status-pending{% endif %}">
+                            {{ payment_status|upper }}
+                        </span>
+                    </div>
+                </div>
+                <div class="booking-detail-row">
+                    <div class="detail-label">Booking Status</div>
+                    <div class="detail-value">
+                        <span class="status-badge {% if booking_status == 'paid' or booking_status == 'approved' %}status-paid{% else %}status-pending{% endif %}">
+                            {{ booking_status|upper }}
+                        </span>
+                    </div>
+                </div>
+                {% if campaign_name %}
+                <div class="booking-detail-row">
+                    <div class="detail-label">Campaign Name</div>
+                    <div class="detail-value">{{ campaign_name }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Booked Time Slots -->
+        {% if time_slots and time_slots|length > 0 %}
+        <div class="section-title">Booked Time Slots</div>
+        <table class="time-slots-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for slot in time_slots %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ slot.date }}</td>
+                    <td>{{ slot.time }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if has_more_slots %}
+        <div class="more-slots">
+            + {{ remaining_slots }} more slot{{ 's' if remaining_slots > 1 else '' }} (not shown to fit in invoice)
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <!-- Payment Summary -->
+        <div class="section-title">Payment Summary</div>
+        <div class="payment-summary">
+            <div class="payment-row">
+                <span class="payment-label">Base Amount</span>
+                <span class="payment-value">Rs. {{ "%.2f"|format(base_amount) }}</span>
+            </div>
+            <div class="payment-row">
+                <span class="payment-label">GST @ 18%</span>
+                <span class="payment-value">Rs. {{ "%.2f"|format(gst_amount) }}</span>
+            </div>
+            <div class="payment-total">
+                <div class="payment-row">
+                    <span class="payment-label">TOTAL AMOUNT</span>
+                    <span class="payment-value">Rs. {{ "%.2f"|format(total_amount) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction Details -->
+        {% if (payment_id and payment_id != '' and payment_id != 'None') or (order_id and order_id != '' and order_id != 'None') %}
+        <div class="transaction-section">
+            <div class="section-title">Transaction Details</div>
+            <div class="transaction-grid">
+                {% if payment_id and payment_id != '' and payment_id != 'None' %}
+                <div class="transaction-item">
+                    <div class="transaction-label">Payment ID</div>
+                    <div class="transaction-value">{{ payment_id }}</div>
+                </div>
+                {% endif %}
+                {% if order_id and order_id != '' and order_id != 'None' %}
+                <div class="transaction-item">
+                    <div class="transaction-label">Order ID</div>
+                    <div class="transaction-value">{{ order_id }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="invoice-footer">
+            <div class="footer-note">
+                <strong>Note:</strong> This is a system-generated invoice and does not require a signature.
+                For any queries regarding this invoice, please contact us at {{ support_email }}.
+            </div>
+            <p>© {{ current_year }} Mark AI. All rights reserved.</p>
+            <p style="margin-top: 5px; font-size: 11px; color: #999999;">
+                Generated on {{ generated_at }}
+            </p>
+        </div>
+
+    </div>
+</body>
+</html>
