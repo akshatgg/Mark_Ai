@@ -145,7 +145,7 @@ export const EditableTargetAudienceCard = ({
         {items.map(({ icon: Icon, label, text, editValue, onChange }) => (
           <div key={label} className="space-y-1">
             <div className="flex items-center gap-2">
-              <Icon className="w-4 h-4 text-[var(--brand-blue)]" />
+              <Icon className="w-4 h-4 text-purple-400" />
               <span
                 className="font-medium transition-colors duration-300"
                 style={{ color: "var(--text-secondary)" }}
@@ -157,7 +157,7 @@ export const EditableTargetAudienceCard = ({
               <textarea
                 value={editValue}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full pl-6 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300 resize-none"
+                className="w-full pl-6 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300 resize-none"
                 style={{
                   backgroundColor: "var(--bg-card)",
                   borderColor: "var(--border-primary)",

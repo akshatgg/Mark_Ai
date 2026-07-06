@@ -135,7 +135,7 @@ export const EditableScreenOverview = ({
           type="text"
           value={editedScreenName}
           onChange={(e) => setEditedScreenName(e.target.value)}
-          className="w-full px-3 py-2 text-3xl md:text-4xl font-semibold heading-font border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300"
+          className="w-full px-3 py-2 text-3xl md:text-4xl font-semibold heading-font border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300"
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-primary)',
@@ -157,7 +157,7 @@ export const EditableScreenOverview = ({
         <textarea
           value={editedDescription}
           onChange={(e) => setEditedDescription(e.target.value)}
-          className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300 resize-none"
+          className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300 resize-none"
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-primary)',
@@ -188,7 +188,7 @@ export const EditableScreenOverview = ({
                 type="text"
                 value={editedLocation}
                 onChange={(e) => setEditedLocation(e.target.value)}
-                className="flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300"
+                className="flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--border-primary)',
@@ -206,7 +206,7 @@ export const EditableScreenOverview = ({
                 type="text"
                 value={editedCafeName}
                 onChange={(e) => setEditedCafeName(e.target.value)}
-                className="flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300"
+                className="flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--border-primary)',
@@ -247,7 +247,7 @@ export const EditableScreenOverview = ({
                   max="5"
                   value={editedRating}
                   onChange={(e) => setEditedRating(e.target.value)}
-                  className="w-16 px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300"
+                  className="w-16 px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300"
                   style={{
                     backgroundColor: 'var(--bg-card)',
                     borderColor: 'var(--border-primary)',
@@ -264,7 +264,7 @@ export const EditableScreenOverview = ({
                   min="0"
                   value={editedReviews}
                   onChange={(e) => setEditedReviews(e.target.value)}
-                  className="w-20 px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300"
+                  className="w-20 px-2 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300"
                   style={{
                     backgroundColor: 'var(--bg-card)',
                     borderColor: 'var(--border-primary)',

@@ -24,3 +24,6 @@ mesa-startup-lab-*.json
 
 # Logs
 *.log
+
+# Local dev reset helper (not for the repo)
+reset-dev.sh

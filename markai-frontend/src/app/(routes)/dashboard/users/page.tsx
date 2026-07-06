@@ -186,7 +186,7 @@ const UsersPage = () => {
       case "screen_owner":
         return "bg-blue-500/20 text-blue-400 border-blue-500/30";
       default:
-        return "bg-[var(--brand-blue)]/15 text-[var(--brand-blue)] border-[var(--brand-blue)]/30";
+        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
     }
   };
 

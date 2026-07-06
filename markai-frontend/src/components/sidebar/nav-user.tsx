@@ -111,7 +111,7 @@ export function NavUser() {
                 )}
                 {isAdvertiser && !isAdmin && !isScreenOwner && (
                   <>
-                    <User className="w-3 h-3 text-[var(--brand-blue)]" />
+                    <User className="w-3 h-3 text-purple-400" />
                     <span>Advertiser</span>
                   </>
                 )}

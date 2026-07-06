@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import AuthSidePanel from "@/components/auth/AuthSidePanel";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
@@ -200,25 +199,31 @@ const SignUpForm = () => {
   };
 
   return (
-    <div className="relative lg:h-screen lg:overflow-hidden transition-colors duration-300" >
+    <div className="relative min-h-screen pt-24 overflow-hidden transition-colors duration-300" >
       <div className="dark:block hidden absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(47,86,224,0.22),transparent_55%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(31,196,207,0.12),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(123,67,255,0.25),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(139,92,246,0.1),transparent)]" />
       </div>
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 lg:h-screen">
-        <AuthSidePanel
-          eyebrow="Mark AI for Brands"
-          title={<>Create your campaign workspace in two simple steps.</>}
-          subtitle="Unlock premium digital inventory, manage bookings, and collaborate with our team in real time."
-          bullets={[
-            "1,500+ premium screens across India",
-            "Live impression & footfall analytics",
-            "Book, schedule and go live in minutes",
-          ]}
-        />
+      <div className="relative z-10 flex flex-col lg:flex-row min-h-screen">
+        <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-16">
+          <p className="text-sm uppercase tracking-[0.3em] mb-4 transition-colors duration-300" style={{ color: 'var(--accent-purple)' }}>Mark AI for Brands</p>
+          <h1 className="text-4xl lg:text-5xl heading-font font-semibold mb-6 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+            Create your campaign workspace in two simple steps.
+          </h1>
+          <p className="text-lg transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
+            Unlock premium digital inventory, manage bookings, and collaborate with our team in real time.
+          </p>
+        </div>
 
-        <div className="flex flex-col px-6 pt-24 pb-6 lg:px-12 lg:pt-24 lg:pb-8 lg:justify-center lg:overflow-y-auto transition-colors duration-300" style={{ borderLeftColor: 'var(--border-primary)', borderLeftWidth: '1px', borderLeftStyle: 'solid' }}>
-          <div className="mb-6 flex items-center gap-4">
+        <div className="flex-1 px-6 py-16 lg:px-12 transition-colors duration-300" style={{  borderLeftColor: 'var(--border-primary)', borderLeftWidth: '1px', borderLeftStyle: 'solid' }}>
+          <div className="flex items-center justify-between text-sm mb-6 transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
+            <span>Already have an account?</span>
+            <Link href="/auth/login" className="font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-purple)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-primary)'}>
+              Login
+            </Link>
+          </div>
+
+          <div className="mb-8 flex items-center gap-4">
             {[1, 2].map((s) => (
               <div key={s} className="flex items-center gap-2">
                 <div
@@ -241,7 +246,7 @@ const SignUpForm = () => {
             ))}
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-6" onSubmit={handleSubmit}>
             {step === 1 && (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -305,7 +310,8 @@ const SignUpForm = () => {
                   type="button"
                   onClick={handleNext}
                   disabled={isSubmitting}
-                  className="brand-gradient-bg w-full rounded-full font-semibold py-3 disabled:opacity-70 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+                  style={{ backgroundColor: 'var(--accent-purple)', color: '#ffffff' }}
+                  className="w-full font-semibold py-3 disabled:opacity-70 transition-all duration-300 hover:opacity-90"
                 >
                   {isSubmitting ? "Sending OTP..." : "Continue to Business Details"}
                 </Button>
@@ -444,7 +450,8 @@ const SignUpForm = () => {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="brand-gradient-bg flex-2 rounded-full font-semibold py-3 disabled:opacity-70 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+                    style={{ backgroundColor: 'var(--accent-purple)', color: '#ffffff' }}
+                    className="flex-2 font-semibold py-3 disabled:opacity-70 transition-all duration-300 hover:opacity-90"
                   >
                     {isSubmitting ? "Finishing..." : "Complete Registration"}
                   </Button>
@@ -452,19 +459,6 @@ const SignUpForm = () => {
               </div>
             )}
           </form>
-
-          <div className="mt-6 text-center text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
-            <span>Already have an account?</span>{" "}
-            <Link
-              href="/auth/login"
-              className="font-semibold transition-colors duration-300"
-              style={{ color: 'var(--text-primary)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-purple)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
-            >
-              Login
-            </Link>
-          </div>
         </div>
       </div>
 

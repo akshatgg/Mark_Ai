@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -653,7 +652,7 @@ const BookingsPage = () => {
       formData.append('file', file);
 
       // Use the same BASE_URL pattern as apiClient
-      const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://mainbackend.mark-ai.tech/api";
+      const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.mark-ai.tech/api";
       const cleanBaseUrl = baseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
 
       const response = await fetch(`${cleanBaseUrl}/api/media/upload`, {
@@ -828,71 +827,30 @@ const BookingsPage = () => {
 
     // For multi-screen bookings, create a unique key from the group ID
     const cardKey = groupedBooking.booking_group_id || primaryBooking._id;
-    const shortId = (groupedBooking.booking_group_id || primaryBooking._id).slice(-8);
-    const screenLabel = groupedBooking.is_multi_screen
-      ? `Multi-Screen Booking (${groupedBooking.bookings.length} screens)`
-      : primaryBooking.screen_name;
-    const dateRange = `${formatDate(primaryBooking.start_date)} → ${formatDate(primaryBooking.end_date)}`;
-    const amountText = formatCurrency(groupedBooking.total_amount, primaryBooking.currency);
-    const paidGood = groupedBooking.payment_status === "paid";
 
     return (
-      <Card
-        key={cardKey}
-        className="card-surface group overflow-hidden transition-all duration-300 hover:border-strong hover:-translate-y-0.5"
-      >
-        <Link
-          href={`/dashboard/bookings/${cardKey}`}
-          className="block w-full text-left px-5 py-4 flex flex-col gap-4 md:flex-row md:items-center md:gap-6"
-        >
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-faint font-mono">
-              #{shortId}
-            </p>
-            <div className="mt-1 flex items-center flex-wrap gap-x-2.5 gap-y-1">
-              <h3 className="text-base md:text-lg font-semibold text-base truncate">
-                {screenLabel}
-              </h3>
-              <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+      <Card key={cardKey} className="transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)' }}>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center transition-colors duration-300">
+                <Monitor className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                  {groupedBooking.is_multi_screen
+                    ? `Multi-Screen Booking (${groupedBooking.bookings.length} screens)`
+                    : primaryBooking.screen_name}
+                </CardTitle>
+                <CardDescription className="mt-0.5 transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
+                  ID: {groupedBooking.booking_group_id?.slice(-8) || primaryBooking._id.slice(-8)}
+                </CardDescription>
+              </div>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-subtle">
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                {dateRange}
-              </span>
-              {(isAdmin || !isScreenOwner) && (
-                <span className="inline-flex items-center gap-1 font-semibold text-base">
-                  <IndianRupee className="w-3.5 h-3.5" />
-                  {amountText}
-                </span>
-              )}
-              <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize"
-                style={{
-                  color: paidGood
-                    ? "var(--status-approved-text)"
-                    : "var(--status-pending-text)",
-                  backgroundColor: paidGood
-                    ? "var(--status-approved-bg)"
-                    : "var(--status-pending-bg)",
-                }}
-              >
-                {paidGood ? "Paid" : groupedBooking.payment_status}
-              </span>
-            </div>
+            <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
           </div>
-
-          <span
-            className="text-xs font-semibold inline-flex items-center gap-1 shrink-0 transition group-hover:translate-x-0.5"
-            style={{ color: "var(--brand-blue)" }}
-          >
-            View details
-            <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
-          </span>
-        </Link>
-
-        {false && (
-        <CardContent className="space-y-4 border-t border-base pt-4">
+        </CardHeader>
+        <CardContent className="space-y-4">
           {/* Booking details */}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-center gap-2 transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
@@ -933,7 +891,7 @@ const BookingsPage = () => {
                     size="sm"
                     variant="outline"
                     onClick={() => openEditCreativeDialog(primaryBooking)}
-                    className="ml-2 h-6 px-2 text-xs border-[var(--brand-blue)]/30 text-[var(--brand-blue)] hover:bg-[var(--brand-blue)]/10"
+                    className="ml-2 h-6 px-2 text-xs border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                   >
                     <Edit3 className="w-3 h-3 mr-1" />
                     Edit
@@ -960,9 +918,9 @@ const BookingsPage = () => {
                   </div>
                   <Button
                     size="sm"
-                    onClick={async () => {
+                    onClick={() => {
                       try {
-                        await generateInvoice(primaryBooking);
+                        generateInvoice(primaryBooking);
                         toast.success("Invoice downloaded successfully!");
                       } catch (error) {
                         console.error("Error generating invoice:", error);
@@ -1026,10 +984,10 @@ const BookingsPage = () => {
                 if (screen.timeSlots.length === 0) return null;
 
                 return (
-                  <div key={`${booking._id}-${screen.screenId}`} className="rounded-lg p-4 border border-[var(--brand-blue)]/30 transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)' }}>
+                  <div key={`${booking._id}-${screen.screenId}`} className="rounded-lg p-4 border border-purple-500/30 transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)' }}>
                     {/* Screen Name Header */}
                     <div className="flex items-center gap-2 mb-3 pb-3 transition-colors duration-300" style={{ borderBottom: '1px solid var(--border-primary)' }}>
-                      <Monitor className="w-4 h-4 text-[var(--brand-blue)]" />
+                      <Monitor className="w-4 h-4 text-purple-400" />
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                           {screen.screenName || booking.screen_name || "Screen"}
@@ -1050,7 +1008,7 @@ const BookingsPage = () => {
                       onClick={() => hasMultipleSlots && toggleExpanded(`${booking._id}-${screen.screenId}`)}
                     >
                       <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-[var(--brand-blue)]" />
+                        <Clock className="w-4 h-4 text-purple-400" />
                         <span className="text-sm font-medium transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                           Booked Time Slots ({screen.timeSlots.length})
                         </span>
@@ -1076,12 +1034,12 @@ const BookingsPage = () => {
                             {displaySlots.map((groupedSlot, groupIndex) => (
                               <div
                                 key={groupIndex}
-                                className="bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/20 rounded-lg px-3 py-2 space-y-1.5 transition-colors duration-300"
+                                className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-2 space-y-1.5 transition-colors duration-300"
                               >
                                 {/* Time Range Header */}
                                 <div className="flex items-center gap-2">
-                                  <Clock className="w-3 h-3 text-[var(--brand-blue)]" />
-                                  <span className="text-sm text-[var(--brand-blue)] font-semibold">
+                                  <Clock className="w-3 h-3 text-purple-400" />
+                                  <span className="text-sm text-purple-300 font-semibold">
                                     {groupedSlot.timeRange}
                                   </span>
                                 </div>
@@ -1090,12 +1048,12 @@ const BookingsPage = () => {
                                 <div className="pl-5 space-y-1">
                                   {groupedSlot.dateRanges.map((range, rangeIndex) => (
                                     <div key={rangeIndex} className="flex items-center gap-2 text-sm transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
-                                      <Calendar className="w-3 h-3 text-[var(--brand-blue)]" />
+                                      <Calendar className="w-3 h-3 text-purple-400" />
                                       {range.isSingleDay ? (
                                         <span>{range.startDay}</span>
                                       ) : (
                                         <span>
-                                          {range.startDay} <span className="text-[var(--brand-blue)] mx-1">→</span> {range.endDay}
+                                          {range.startDay} <span className="text-purple-400 mx-1">→</span> {range.endDay}
                                         </span>
                                       )}
                                     </div>
@@ -1110,7 +1068,7 @@ const BookingsPage = () => {
                                   e.stopPropagation();
                                   toggleExpanded(`${booking._id}-${screen.screenId}`);
                                 }}
-                                className="text-sm text-[var(--brand-blue)] hover:text-[var(--brand-blue)] w-full text-center py-1"
+                                className="text-sm text-purple-400 hover:text-purple-300 w-full text-center py-1"
                               >
                                 + {groupedSlots.length - 2} more time slot{groupedSlots.length - 2 !== 1 ? 's' : ''}
                               </button>
@@ -1133,7 +1091,7 @@ const BookingsPage = () => {
                 <span className="font-medium transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>{booking.screen_name}</span>
                 {/* Show Layout ID after approval */}
                 {booking.xibo_layout_id && (
-                  <span className="text-[var(--brand-blue)] ml-auto text-xs">Layout ID: {booking.xibo_layout_id}</span>
+                  <span className="text-purple-400 ml-auto text-xs">Layout ID: {booking.xibo_layout_id}</span>
                 )}
               </div>
               <div className="flex items-center gap-4 text-sm flex-wrap">
@@ -1221,7 +1179,7 @@ const BookingsPage = () => {
                       <span className="text-gray-500">(Schedule ID: {booking.xibo_schedule_id})</span>
                     )}
                     {booking.xibo_layout_id && (
-                      <span className="text-[var(--brand-blue)] ml-2">(Layout ID: {booking.xibo_layout_id})</span>
+                      <span className="text-purple-400 ml-2">(Layout ID: {booking.xibo_layout_id})</span>
                     )}
                   </div>
                   <Button
@@ -1359,7 +1317,7 @@ const BookingsPage = () => {
                   <span className="text-gray-500">(Schedule ID: {primaryBooking.xibo_schedule_id})</span>
                 )}
                 {primaryBooking.xibo_layout_id && (
-                  <span className="text-[var(--brand-blue)] ml-2">(Layout ID: {primaryBooking.xibo_layout_id})</span>
+                  <span className="text-purple-400 ml-2">(Layout ID: {primaryBooking.xibo_layout_id})</span>
                 )}
               </div>
               <Button
@@ -1383,7 +1341,6 @@ const BookingsPage = () => {
             </div>
           )}
         </CardContent>
-        )}
       </Card>
     );
   };
@@ -1427,29 +1384,18 @@ const BookingsPage = () => {
       {/* Tabs for admin/screen owner */}
       {(isAdmin || isScreenOwner) ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList
-            className="inline-flex h-auto items-center gap-0.5 rounded-full p-0.5 bg-elev"
-            style={{ border: '1px solid var(--color-border)' }}
-          >
+          <TabsList className="transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)', border: '1px solid' }}>
             <TabsTrigger
               value="all"
-              className="rounded-full px-3 py-1 text-xs font-semibold text-subtle transition-all duration-300 data-[state=active]:text-white data-[state=active]:shadow-brand-soft"
-              style={
-                activeTab === 'all'
-                  ? { background: 'var(--brand-gradient)', color: 'var(--color-on-brand)' }
-                  : undefined
-              }
+              className="data-[state=active]:bg-white data-[state=active]:text-black transition-colors duration-300"
+              style={{ color: activeTab === 'all' ? undefined : 'var(--text-secondary)' }}
             >
               All Bookings
             </TabsTrigger>
             <TabsTrigger
               value="pending"
-              className="rounded-full px-3 py-1 text-xs font-semibold text-subtle transition-all duration-300 data-[state=active]:text-white data-[state=active]:shadow-brand-soft"
-              style={
-                activeTab === 'pending'
-                  ? { background: 'var(--brand-gradient)', color: 'var(--color-on-brand)' }
-                  : undefined
-              }
+              className="data-[state=active]:bg-white data-[state=active]:text-black transition-colors duration-300"
+              style={{ color: activeTab === 'pending' ? undefined : 'var(--text-secondary)' }}
             >
               Pending Approval
             </TabsTrigger>
@@ -1958,7 +1904,7 @@ const BookingsPage = () => {
                 {gstDialog.booking.gst_state && (
                   <div className="bg-[#1a1a1a] rounded-lg p-4 border border-white/10">
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-4 h-4 text-[var(--brand-blue)]" />
+                      <MapPin className="w-4 h-4 text-purple-400" />
                       <p className="text-xs text-gray-500 font-semibold uppercase">State</p>
                     </div>
                     <p className="text-base text-white">{gstDialog.booking.gst_state}</p>
@@ -1969,7 +1915,7 @@ const BookingsPage = () => {
                 {gstDialog.booking.gst_city && (
                   <div className="bg-[#1a1a1a] rounded-lg p-4 border border-white/10">
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-4 h-4 text-[var(--brand-blue)]" />
+                      <MapPin className="w-4 h-4 text-purple-400" />
                       <p className="text-xs text-gray-500 font-semibold uppercase">City</p>
                     </div>
                     <p className="text-base text-white">{gstDialog.booking.gst_city}</p>
@@ -1980,7 +1926,7 @@ const BookingsPage = () => {
                 {gstDialog.booking.gst_pincode && (
                   <div className="bg-[#1a1a1a] rounded-lg p-4 border border-white/10">
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-4 h-4 text-[var(--brand-blue)]" />
+                      <MapPin className="w-4 h-4 text-purple-400" />
                       <p className="text-xs text-gray-500 font-semibold uppercase">Pincode</p>
                     </div>
                     <p className="text-base text-white font-mono">{gstDialog.booking.gst_pincode}</p>
@@ -1991,7 +1937,7 @@ const BookingsPage = () => {
                 {gstDialog.booking.gst_address && (
                   <div className="bg-[#1a1a1a] rounded-lg p-4 border border-white/10 md:col-span-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-4 h-4 text-[var(--brand-blue)]" />
+                      <MapPin className="w-4 h-4 text-purple-400" />
                       <p className="text-xs text-gray-500 font-semibold uppercase">Billing Address</p>
                     </div>
                     <p className="text-base text-white leading-relaxed">
@@ -2074,7 +2020,7 @@ const BookingsPage = () => {
         <DialogContent className="max-w-lg transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}>
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
-              <ImageIcon className="w-5 h-5 text-[var(--brand-blue)]" />
+              <ImageIcon className="w-5 h-5 text-purple-400" />
               Edit Creative
             </DialogTitle>
             <DialogDescription className="transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
@@ -2096,8 +2042,8 @@ const BookingsPage = () => {
                   <p className="text-sm mb-2 transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>Current Creative</p>
                   <div className="flex items-center gap-3">
                     {editCreativeDialog.booking.media_type === "video" ? (
-                      <div className="w-16 h-16 rounded bg-[var(--brand-blue)]/15 flex items-center justify-center">
-                        <Play className="w-8 h-8 text-[var(--brand-blue)]" />
+                      <div className="w-16 h-16 rounded bg-purple-500/20 flex items-center justify-center">
+                        <Play className="w-8 h-8 text-purple-400" />
                       </div>
                     ) : (
                       <img
@@ -2143,14 +2089,14 @@ const BookingsPage = () => {
                         ? "border-green-500/50 bg-green-500/10"
                         : uploadError
                         ? "border-red-500/50 bg-red-500/10"
-                        : "hover:border-[var(--brand-blue)]/50 hover:bg-[var(--brand-blue)]/5"
+                        : "hover:border-purple-500/50 hover:bg-purple-500/5"
                     }`}
                     style={!uploadedFile && !uploadError ? { borderColor: 'var(--border-primary)' } : {}}
                   >
                     {isUploading ? (
                       <>
-                        <Loader2 className="w-5 h-5 text-[var(--brand-blue)] animate-spin" />
-                        <span className="text-sm text-[var(--brand-blue)]">Uploading...</span>
+                        <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                        <span className="text-sm text-purple-400">Uploading...</span>
                       </>
                     ) : uploadedFile && newMediaUrl ? (
                       <>
@@ -2216,7 +2162,7 @@ const BookingsPage = () => {
                     variant={newMediaType === "image" ? "default" : "outline"}
                     onClick={() => setNewMediaType("image")}
                     className={newMediaType === "image"
-                      ? "bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white"
+                      ? "bg-purple-600 hover:bg-purple-700 text-white"
                       : "border-white/10 text-white hover:bg-white/10"}
                   >
                     <ImageIcon className="w-4 h-4 mr-2" />
@@ -2228,7 +2174,7 @@ const BookingsPage = () => {
                     variant={newMediaType === "video" ? "default" : "outline"}
                     onClick={() => setNewMediaType("video")}
                     className={newMediaType === "video"
-                      ? "bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white"
+                      ? "bg-purple-600 hover:bg-purple-700 text-white"
                       : "border-white/10 text-white hover:bg-white/10"}
                   >
                     <Play className="w-4 h-4 mr-2" />
@@ -2271,7 +2217,7 @@ const BookingsPage = () => {
             <Button
               onClick={handleUpdateCreative}
               disabled={isProcessing || isUploading || !newMediaUrl.trim()}
-              className="bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-dark)] text-white"
+              className="bg-purple-600 hover:bg-purple-700 text-white"
             >
               {isProcessing ? (
                 <>

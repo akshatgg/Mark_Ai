@@ -34,12 +34,12 @@ export function NavMain({
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   asChild
+                  tooltip={item.title}
                   isActive={isActive}
-                  className="rounded-lg transition-all duration-300"
+                  className="transition-all  duration-300"
                   style={isActive ? {
-                    background: 'var(--brand-gradient)',
-                    color: 'var(--color-on-brand)',
-                    boxShadow: '0 8px 24px -10px var(--brand-glow-blue-soft)'
+                    backgroundColor: 'var(--text-primary)',
+                    color: 'var(--text-inverse)'
                   } : undefined}
                 >
                   <Link href={item.url}>

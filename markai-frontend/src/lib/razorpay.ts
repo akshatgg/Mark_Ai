@@ -99,8 +99,7 @@ export const initiateRazorpayPayment = async (
       },
     },
     theme: {
-      // Default brand blue — mirrors --brand-blue in theme.css (Razorpay needs hex strings)
-      color: options.theme?.color || "#2f56e0",
+      color: options.theme?.color || "#7B43FF",
     },
     notes: options.notes || {},
   };

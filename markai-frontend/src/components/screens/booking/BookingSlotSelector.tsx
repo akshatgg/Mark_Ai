@@ -546,7 +546,7 @@ export const BookingSlotSelector = ({
       {/* DATE RANGE SELECTOR - STEP 1 */}
       <div className="mb-4 p-4 rounded-xl border-2 border-dashed transition-colors duration-300" style={{ borderColor: fromDate && toDate ? 'var(--border-primary)' : '#a78bfa', backgroundColor: fromDate && toDate ? 'var(--bg-card)' : 'rgba(167, 139, 250, 0.1)' }}>
         <div className="flex items-center gap-2 mb-3">
-          <CalendarRange className="w-5 h-5 text-[var(--brand-blue)]" />
+          <CalendarRange className="w-5 h-5 text-purple-400" />
           <h3 className="text-lg font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
             Step 1: Select Date Range
           </h3>
@@ -564,14 +564,14 @@ export const BookingSlotSelector = ({
                   className={cn(
                     "w-full flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-all duration-300",
                     fromDate
-                      ? "border-[var(--brand-blue)] bg-[var(--brand-blue)]/10"
-                      : "border-dashed hover:border-[var(--brand-cyan)]"
+                      ? "border-purple-500 bg-purple-500/10"
+                      : "border-dashed hover:border-purple-400"
                   )}
                   style={!fromDate ? { borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-card)', color: 'var(--text-tertiary)' } : {}}
                 >
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4" />
-                    <span className={cn("font-medium", fromDate ? "text-[var(--brand-blue)]" : "")} style={!fromDate ? { color: 'var(--text-tertiary)' } : {}}>
+                    <span className={cn("font-medium", fromDate ? "text-purple-300" : "")} style={!fromDate ? { color: 'var(--text-tertiary)' } : {}}>
                       {formatDateDisplay(fromDate)}
                     </span>
                   </div>
@@ -612,15 +612,15 @@ export const BookingSlotSelector = ({
                   className={cn(
                     "w-full flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-all duration-300",
                     toDate
-                      ? "border-[var(--brand-blue)] bg-[var(--brand-blue)]/10"
-                      : "border-dashed hover:border-[var(--brand-cyan)]",
+                      ? "border-purple-500 bg-purple-500/10"
+                      : "border-dashed hover:border-purple-400",
                     !fromDate && "opacity-50 cursor-not-allowed"
                   )}
                   style={!toDate ? { borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-card)', color: 'var(--text-tertiary)' } : {}}
                 >
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4" />
-                    <span className={cn("font-medium", toDate ? "text-[var(--brand-blue)]" : "")} style={!toDate ? { color: 'var(--text-tertiary)' } : {}}>
+                    <span className={cn("font-medium", toDate ? "text-purple-300" : "")} style={!toDate ? { color: 'var(--text-tertiary)' } : {}}>
                       {formatDateDisplay(toDate)}
                     </span>
                   </div>
@@ -654,8 +654,8 @@ export const BookingSlotSelector = ({
 
         {/* Date Range Summary */}
         {fromDate && toDate && (
-          <div className="mt-3 p-2.5 bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 rounded-lg">
-            <p className="text-sm text-[var(--brand-blue)]">
+          <div className="mt-3 p-2.5 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+            <p className="text-sm text-purple-300">
               Selected Range: <span className="font-semibold">{formatDateDisplay(fromDate)}</span> → <span className="font-semibold">{formatDateDisplay(toDate)}</span>
               <span className="ml-2 text-xs opacity-75">
                 ({Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} days)
@@ -676,7 +676,7 @@ export const BookingSlotSelector = ({
       {fromDate && toDate && weekSlots.length > 0 ? (
         <>
           <div className="flex items-center gap-2 mb-3 mt-4">
-            <Clock className="w-5 h-5 text-[var(--brand-blue)]" />
+            <Clock className="w-5 h-5 text-purple-400" />
             <h3 className="text-lg font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
               Step 2: Select Time Slots
             </h3>
@@ -695,11 +695,11 @@ export const BookingSlotSelector = ({
                 onClick={() => setSelectedDay(day.date)}
                 className={`px-4 py-3 rounded-lg font-medium whitespace-nowrap transition-all flex flex-col items-center relative ${
                   selectedDay === day.date
-                    ? "bg-[var(--brand-blue)]"
+                    ? "bg-purple-500"
                     : allSelected
-                    ? "bg-[var(--brand-blue)] border-2 border-[var(--brand-cyan)]"
+                    ? "bg-purple-500 border-2 border-purple-400"
                     : hasSelectedSlots
-                    ? "border-2 border-[var(--brand-cyan)]"
+                    ? "border-2 border-purple-400"
                     : ""
                 }`}
                 style={
@@ -714,11 +714,11 @@ export const BookingSlotSelector = ({
                 <span className="text-sm">{day.dateDisplay}</span>
                 {/* Indicator dot when slots are selected */}
                 {hasSelectedSlots && !allSelected && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--brand-cyan)] rounded-full"></span>
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-purple-400 rounded-full"></span>
                 )}
                 {/* "All selected" indicator */}
                 {allSelected && (
-                  <span className="absolute -top-1 -right-1 bg-[var(--brand-blue)] text-white text-[8px] px-1 rounded-full font-bold">ALL</span>
+                  <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[8px] px-1 rounded-full font-bold">ALL</span>
                 )}
               </button>
             </div>
@@ -746,7 +746,7 @@ export const BookingSlotSelector = ({
                     onClick={() => onSlotToggle(slot.id)}
                     className={`w-full p-3 rounded-xl border-2 transition-all duration-300 text-left relative cursor-pointer ${
                       isSelected
-                        ? "border-[var(--brand-blue)] bg-[var(--brand-blue)]/15"
+                        ? "border-purple-500 bg-purple-500/20"
                         : ""
                     }`}
                     style={!isSelected ? { borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-card)' } : {}}
@@ -803,7 +803,7 @@ export const BookingSlotSelector = ({
 
       {/* Selected Slots Summary */}
       {selectedSlots.size > 0 && (
-        <div className="mt-4 p-3 bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 rounded-xl transition-colors duration-300">
+        <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl transition-colors duration-300">
           <div className="mb-2.5">
             <p className="text-sm font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
               {selectedSlots.size} slot{selectedSlots.size > 1 ? "s" : ""} selected
@@ -813,14 +813,14 @@ export const BookingSlotSelector = ({
             {getGroupedSelectedSlots().map((range, index) => (
               <div
                 key={`range-${index}`}
-                className="p-2.5 bg-[var(--brand-blue)]/15 border border-[var(--brand-blue)]/30 rounded-lg transition-colors duration-300"
+                className="p-2.5 bg-purple-500/20 border border-purple-500/30 rounded-lg transition-colors duration-300"
               >
                 <p className="text-sm font-medium transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                   {range.isSameDay ? (
                     range.startDateDisplay
                   ) : (
                     <>
-                      {range.startDateDisplay} <span className="text-[var(--brand-blue)]">→</span> {range.endDateDisplay}
+                      {range.startDateDisplay} <span className="text-purple-400">→</span> {range.endDateDisplay}
                     </>
                   )}
                 </p>

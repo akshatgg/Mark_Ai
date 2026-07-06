@@ -17,7 +17,7 @@ import { RazorpayPaymentButton } from "./RazorpayPaymentButton";
 import toast from "react-hot-toast";
 import { apiUrl } from "@/utility/apiUrl";
 
-const BACKEND_URL = apiUrl || "https://mainbackend.mark-ai.tech";
+const BACKEND_URL = apiUrl || "https://api.mark-ai.tech/api";
 
 interface CampaignFormData {
   name: string;
@@ -486,8 +486,8 @@ export const CampaignForm = ({
             >
               {isUploading ? (
                 <>
-                  <Loader2 className="w-5 h-5 text-[var(--brand-blue)] animate-spin" />
-                  <span className="text-sm text-[var(--brand-blue)]">Uploading to cloud...</span>
+                  <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                  <span className="text-sm text-purple-400">Uploading to cloud...</span>
                 </>
               ) : uploadedMedia ? (
                 <>
@@ -539,7 +539,7 @@ export const CampaignForm = ({
             <button
               type="button"
               onClick={() => setShowGstForm(!showGstForm)}
-              className="text-xs text-[var(--brand-blue)] hover:text-[var(--brand-cyan)] underline transition-colors duration-300"
+              className="text-xs text-purple-400 hover:text-purple-300 underline transition-colors duration-300"
             >
               {showGstForm ? "Hide" : "Add for Tax Invoice"}
             </button>
@@ -570,7 +570,7 @@ export const CampaignForm = ({
                     maxLength={15}
                   />
                   {isValidatingGst && (
-                    <Loader2 className="w-4 h-4 text-[var(--brand-blue)] animate-spin absolute right-3 top-1/2 -translate-y-1/2" />
+                    <Loader2 className="w-4 h-4 text-purple-400 animate-spin absolute right-3 top-1/2 -translate-y-1/2" />
                   )}
                   {!isValidatingGst && gstinValid === true && (
                     <CheckCircle className="w-4 h-4 text-green-400 absolute right-3 top-1/2 -translate-y-1/2" />
@@ -704,12 +704,12 @@ export const CampaignForm = ({
 
 
         {/* Fare Calculation */}
-        <div className="p-4 bg-[var(--brand-blue)]/10 border border-[var(--brand-blue)]/30 rounded-lg space-y-3 transition-colors duration-300">
+        <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg space-y-3 transition-colors duration-300">
           {isMultiScreen && screensData.length > 1 ? (
             <>
               {/* Multi-Screen Breakdown */}
               <div className="space-y-2 mb-3 pb-3 transition-colors duration-300" style={{ borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: 'var(--border-primary)' }}>
-                <p className="text-xs font-semibold text-[var(--brand-blue)] uppercase tracking-wide mb-2">
+                <p className="text-xs font-semibold text-purple-300 uppercase tracking-wide mb-2">
                   {screensData.length} Screens Selected
                 </p>
                 {screensData.map((screen) => (
@@ -778,7 +778,7 @@ export const CampaignForm = ({
                 <div className="pt-2 transition-colors duration-300" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'var(--border-primary)' }}>
                   <div className="flex justify-between items-center">
                     <span className="font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Total Amount</span>
-                    <span className="text-2xl font-bold text-[var(--brand-blue)]">
+                    <span className="text-2xl font-bold text-purple-400">
                       ₹{totalFare.toLocaleString()}
                     </span>
                   </div>
@@ -835,7 +835,7 @@ export const CampaignForm = ({
                 <div className="pt-2 transition-colors duration-300" style={{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'var(--border-primary)' }}>
                   <div className="flex justify-between items-center">
                     <span className="font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Total Amount</span>
-                    <span className="text-2xl font-bold text-[var(--brand-blue)]">
+                    <span className="text-2xl font-bold text-purple-400">
                       ₹{totalFare.toLocaleString()}
                     </span>
                   </div>

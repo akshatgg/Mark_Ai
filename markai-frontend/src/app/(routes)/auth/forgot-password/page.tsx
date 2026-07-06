@@ -3,11 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import AuthSidePanel from "@/components/auth/AuthSidePanel";
 import { forgotPassword } from "@/services/authService";
 import toast from "react-hot-toast";
 
@@ -30,8 +29,8 @@ const ForgotPasswordPage = () => {
       setResetToken(response.token);
       setSuccess(true);
       toast.success("Password reset link sent to your email!");
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to send reset token";
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to send reset token";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -46,83 +45,114 @@ const ForgotPasswordPage = () => {
   };
 
   return (
-    <div className="relative lg:h-screen lg:overflow-hidden bg-base">
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 lg:h-screen">
-        <AuthSidePanel
-          eyebrow="Account recovery"
-          title={<>Reset your password in two clicks.</>}
-          subtitle="Enter the email tied to your Mark AI account — we'll send you a secure reset link, valid for 15 minutes."
-          bullets={[
-            "Secure, time-bound reset links",
-            "We never store your password in plain text",
-            "Need help? Email hello@mark-ai.tech",
-          ]}
-        />
+    <div className="relative min-h-screen overflow-hidden transition-colors duration-300" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+      {/* Theme-aware gradient backgrounds */}
+      <div className="dark:block hidden absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(123,67,255,0.25),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(139,92,246,0.1),transparent)]" />
+      </div>
 
-        <div className="flex flex-col px-6 pt-24 pb-6 lg:px-12 lg:pt-24 lg:pb-8 lg:justify-center lg:overflow-y-auto border-l border-base">
-          <div className="mx-auto w-full max-w-md">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] brand-gradient-text">
-              Forgot Password
-            </p>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight text-base">
-              {success ? "Check your inbox" : "Reset your password"}
-            </h1>
-            <p className="mt-3 text-sm text-muted">
-              {success
-                ? "We've sent a password reset link to your email."
-                : "Enter your email address and we'll send you a secure reset link."}
-            </p>
-
-            {!success ? (
-              <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-base">Email address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-subtle" />
-                    <Input
-                      type="email"
-                      placeholder="you@brand.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        setError("");
-                      }}
-                      className="border-base bg-base pl-10 py-3 text-base placeholder:text-faint"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {error && <p className="text-sm text-red-500">{error}</p>}
-
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="brand-gradient-bg w-full rounded-full py-3 font-semibold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg disabled:opacity-70"
-                >
-                  {isSubmitting ? "Sending…" : "Send reset link"}
-                </Button>
-              </form>
-            ) : (
-              <div className="mt-8 space-y-4">
-                <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-center text-sm text-green-600 dark:text-green-400">
-                  Check your email for the password reset link.
-                </div>
-                <Button
-                  onClick={handleContinue}
-                  className="brand-gradient-bg w-full rounded-full py-3 font-semibold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
-                >
-                  Continue to reset password
-                </Button>
-              </div>
-            )}
-
-            <div className="mt-8 text-center text-sm text-subtle">
-              <span>Remember your password?</span>{" "}
-              <Link href="/auth/login" className="font-semibold text-base transition hover:opacity-80">
-                Sign in
-              </Link>
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-10">
+        <div
+          className="w-full max-w-md space-y-8 rounded-3xl p-10 backdrop-blur-3xl shadow-2xl transition-all duration-300"
+          style={{
+            borderColor: 'var(--border-primary)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            backgroundColor: 'var(--bg-primary)',
+            boxShadow: '0 25px 50px -12px var(--shadow-lg)'
+          }}
+        >
+          <div className="space-y-4 text-center">
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center gap-2 transition-colors duration-300 mb-4"
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Login
+            </Link>
+            <p className="text-xs uppercase tracking-[0.35em] transition-colors duration-300" style={{ color: 'var(--accent-purple)', opacity: 0.8 }}>Reset Password</p>
+            <div>
+              <h1 className="heading-font text-3xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Forgot Password?</h1>
+              <p className="mt-2 text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
+                {success
+                  ? "We've sent a password reset link to your email."
+                  : "Enter your email address and we'll send you a link to reset your password."}
+              </p>
             </div>
+          </div>
+
+          {!success ? (
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }} />
+                  <Input
+                    type="email"
+                    placeholder="you@brand.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError("");
+                    }}
+                    className="pl-10 border py-3 transition-all duration-300"
+                    style={{
+                      backgroundColor: 'var(--bg-accent)',
+                      borderColor: 'var(--border-primary)',
+                      color: 'var(--text-primary)'
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3 font-semibold transition-all duration-300 disabled:opacity-70"
+                style={{
+                  backgroundColor: 'var(--accent-blue)',
+                  color: 'var(--text-inverse)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              >
+                {isSubmitting ? "Sending..." : "Send Reset Link"}
+              </Button>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-sm text-green-400 text-center">
+                  Check your email for the password reset link.
+                </p>
+              </div>
+              <Button
+                onClick={handleContinue}
+                className="w-full py-3 font-semibold transition-all duration-300"
+                style={{
+                  backgroundColor: 'var(--accent-blue)',
+                  color: 'var(--text-inverse)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              >
+                Continue to Reset Password
+              </Button>
+            </div>
+          )}
+
+          <div className="text-center text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
+            <span>Remember your password?</span>{" "}
+            <Link href="/auth/login" className="font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-purple)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-primary)'}>
+              Sign in
+            </Link>
           </div>
         </div>
       </div>

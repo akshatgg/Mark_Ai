@@ -38,7 +38,7 @@ export const ScreenInsights = ({ description, highlights }: ScreenInsightsProps)
               backgroundColor: 'var(--bg-primary)'
             }}
           >
-            <Sparkles className="w-5 h-5 text-[var(--brand-blue)] mt-1" />
+            <Sparkles className="w-5 h-5 text-purple-300 mt-1" />
             <p
               className="text-sm transition-colors duration-300"
               style={{ color: 'var(--text-secondary)' }}

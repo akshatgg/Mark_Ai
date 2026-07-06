@@ -172,7 +172,7 @@ export const EditableScreenVenueSnapshot = ({
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300"
+                className="w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--border-primary)',

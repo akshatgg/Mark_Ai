@@ -1,20 +1,21 @@
 "use client";
-import React from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { Twitter, Instagram, Linkedin, Mail, MapPin, Phone, ArrowUpRight } from "lucide-react";
+import React from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Twitter, Instagram, Linkedin, Github } from 'lucide-react';
 
 const Footer = () => {
-  const productLinks = [
-    { title: "Browse Screens", href: "/browse-screens" },
+  const quickLinks = [
+    { title: "Home", href: "/" },
     { title: "About", href: "/about" },
+    { title: "Browse Screens", href: "/browse-screens" },
     { title: "Contact", href: "/contact" },
-    { title: "Dashboard", href: "/dashboard" },
   ];
 
   const accountLinks = [
     { title: "Login", href: "/auth/login" },
     { title: "Sign Up", href: "/auth/signup" },
+    { title: "Dashboard", href: "/dashboard" },
   ];
 
   const legalLinks = [
@@ -23,134 +24,157 @@ const Footer = () => {
     { title: "Advertising Policy", href: "/advertising-policy" },
   ];
 
+
   const socialLinks = [
     { icon: Twitter, href: "https://twitter.com", label: "Twitter" },
     { icon: Instagram, href: "https://instagram.com", label: "Instagram" },
     { icon: Linkedin, href: "https://linkedin.com", label: "LinkedIn" },
+    { icon: Github, href: "https://github.com", label: "GitHub" },
   ];
 
   return (
-    <footer className="relative w-full border-t border-base bg-base">
+    <footer className="relative w-full">
+      {/* Glassmorphism background */}
       <div
-        className="absolute inset-x-0 top-0 h-[3px]"
+        className="absolute inset-0 backdrop-blur-xl border-t transition-colors duration-300"
         style={{
-          background:
-            "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-green) 100%)",
+          background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01))',
+          borderTopColor: 'var(--border-primary)'
         }}
       />
 
-      <div className="mx-auto max-w-7xl px-6 py-16 lg:py-20">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-10">
-          <div className="lg:col-span-5">
-            <Link href="/" className="inline-flex items-center gap-3">
+      <div className="relative z-10 md:w-[85%] mx-auto px-6 py-12 md:py-16">
+        {/* Top Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 mb-12">
+          {/* Left Section - Logo and Description */}
+          <div className="lg:col-span-2">
+            <Link href="/" className="flex items-center gap-3 mb-4 hover:opacity-80 transition-opacity cursor-pointer">
               <Image
                 src="/mark_ai_logo2-removebg-preview.png"
-                alt="Mark AI"
-                width={44}
-                height={44}
-                className="h-10 w-10 object-contain"
+                alt="MarkAI Logo"
+                width={40}
+                height={40}
+                className="h-10 w-auto object-contain"
               />
-              <span
-                className="text-2xl font-extrabold uppercase tracking-tight bg-clip-text text-transparent"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                }}
-              >
-                Mark&nbsp;AI
-              </span>
+              <h2 className="text-2xl font-bold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                Mark AI
+              </h2>
             </Link>
-
-            <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
-              The operating system for India&apos;s outdoor advertising. Plan,
-              book and measure DOOH campaigns across 1,500+ premium screens — all
-              from one dashboard.
+            <p className="text-sm leading-relaxed mb-6 max-w-md transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
+                Mark AI - Meta for Outdoor Ads
+                For brands and agencies in India. Plan, book, and track DOOH campaigns on one simple dashboard.
             </p>
-
-            <ul className="mt-6 space-y-3 text-sm text-muted">
-              <li className="flex items-start gap-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
-                Bengaluru, India
-              </li>
-              <li className="flex items-start gap-3">
-                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
-                <a href="mailto:hello@mark-ai.tech" className="hover:text-base">
-                  hello@mark-ai.tech
-                </a>
-              </li>
-              <li className="flex items-start gap-3">
-                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
-                <a href="tel:+910000000000" className="hover:text-base">
-                  +91 00000 00000
-                </a>
-              </li>
-            </ul>
-
-            <div className="mt-7 flex items-center gap-2">
-              {socialLinks.map((s) => {
-                const Icon = s.icon;
+            {/* Social Media Links */}
+            <div className="flex items-center gap-4">
+              {socialLinks.map((social) => {
+                const Icon = social.icon;
                 return (
                   <Link
-                    key={s.label}
-                    href={s.href}
+                    key={social.label}
+                    href={social.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={s.label}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-base text-muted transition hover:border-gray-300 hover:bg-elev hover:text-base"
+                    className="transition-colors duration-200 p-2 rounded-lg"
+                    style={{ color: 'var(--text-secondary)' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = 'var(--text-primary)';
+                      e.currentTarget.style.backgroundColor = 'var(--bg-accent)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    aria-label={social.label}
                   >
-                    <Icon size={18} />
+                    <Icon size={20} />
                   </Link>
                 );
               })}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:col-span-7">
-            <FooterColumn title="Product" items={productLinks} />
-            <FooterColumn title="Account" items={accountLinks} />
-            <FooterColumn title="Legal" items={legalLinks} />
+          {/* Right Section - Navigation Links */}
+          <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-8">
+            {/* Quick Links Column */}
+            <div>
+              <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                Quick Links
+              </h3>
+              <ul className="space-y-3">
+                {quickLinks.map((link) => (
+                  <li key={link.title}>
+                    <Link
+                      href={link.href}
+                      className="text-sm transition-colors duration-200"
+                      style={{ color: 'var(--text-secondary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    >
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Account Column */}
+            <div>
+              <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                Account
+              </h3>
+              <ul className="space-y-3">
+                {accountLinks.map((link) => (
+                  <li key={link.title}>
+                    <Link
+                      href={link.href}
+                      className="text-sm transition-colors duration-200"
+                      style={{ color: 'var(--text-secondary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    >
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Legal Column */}
+            <div>
+              <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                Legal
+              </h3>
+              <ul className="space-y-3">
+                {legalLinks.map((link) => (
+                  <li key={link.title}>
+                    <Link
+                      href={link.href}
+                      className="text-sm transition-colors duration-200"
+                      style={{ color: 'var(--text-secondary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    >
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 
-        <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-base pt-8 text-sm text-subtle sm:flex-row sm:items-center">
-          <p>© {new Date().getFullYear()} Adneuron Pvt. Ltd. All rights reserved.</p>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-1.5 font-semibold text-base transition hover:text-gray-700"
-          >
-            Start a campaign
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
+        {/* Bottom Section */}
+        <div className="pt-8 border-t flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors duration-300" style={{ borderTopColor: 'var(--border-primary)' }}>
+          <p className="text-sm transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
+            © 2026 Adneuron Pvt. Ltd. All rights reserved.
+          </p>
+          <p className="text-xs transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
+            Made with ❤️ in India
+          </p>
         </div>
       </div>
     </footer>
   );
 };
-
-const FooterColumn = ({
-  title,
-  items,
-}: {
-  title: string;
-  items: { title: string; href: string }[];
-}) => (
-  <div>
-    <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-base">
-      {title}
-    </h3>
-    <ul className="mt-5 space-y-3">
-      {items.map((l) => (
-        <li key={l.title}>
-          <Link
-            href={l.href}
-            className="text-sm text-muted transition-colors duration-300 ease-out hover:text-[var(--brand-green)]"
-          >
-            {l.title}
-          </Link>
-        </li>
-      ))}
-    </ul>
-  </div>
-);
 
 export default Footer;

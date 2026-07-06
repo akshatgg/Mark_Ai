@@ -129,7 +129,7 @@ export const EditableScreenInsights = ({
               backgroundColor: 'var(--bg-primary)'
             }}
           >
-            <Sparkles className="w-5 h-5 text-[var(--brand-blue)] mt-1 shrink-0" />
+            <Sparkles className="w-5 h-5 text-purple-300 mt-1 shrink-0" />
             {isEditing ? (
               <div className="flex-1 flex gap-2">
                 <input
@@ -170,7 +170,7 @@ export const EditableScreenInsights = ({
               backgroundColor: 'var(--bg-primary)'
             }}
           >
-            <Plus className="w-5 h-5 text-[var(--brand-blue)]" />
+            <Plus className="w-5 h-5 text-purple-300" />
             <p
               className="text-sm transition-colors duration-300"
               style={{ color: 'var(--text-tertiary)' }}

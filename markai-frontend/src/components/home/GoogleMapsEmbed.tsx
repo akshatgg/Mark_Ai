@@ -27,7 +27,7 @@ const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-3">
-            <MapPin className="w-6 h-6 text-[var(--brand-blue)]" />
+            <MapPin className="w-6 h-6 text-purple-400" />
             <h2
               className="text-3xl md:text-4xl font-bold heading-font transition-colors duration-300"
               style={{ color: 'var(--text-primary)' }}

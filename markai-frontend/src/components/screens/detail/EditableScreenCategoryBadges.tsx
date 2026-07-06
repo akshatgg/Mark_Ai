@@ -157,7 +157,7 @@ export const EditableScreenCategoryBadges = ({
                   handleAddCategory();
                 }
               }}
-              className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-blue)] transition-colors duration-300"
+              className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-300"
               style={{
                 backgroundColor: 'var(--bg-card)',
                 borderColor: 'var(--border-primary)',

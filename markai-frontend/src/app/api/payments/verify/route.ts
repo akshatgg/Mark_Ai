@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { apiUrl } from "@/utility/apiUrl";
 import { cookies } from "next/headers";
 
-const BACKEND_URL = apiUrl || "https://mainbackend.mark-ai.tech";
+const BACKEND_URL = apiUrl || "https://api.mark-ai.tech/api";
 
 export async function POST(request: NextRequest) {
   try {

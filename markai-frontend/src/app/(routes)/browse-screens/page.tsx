@@ -70,25 +70,13 @@ const BrowseScreensPage = () => {
     }, [currentPage, searchTerm]);
 
     return (
-        <div className="relative w-full min-h-screen overflow-hidden bg-white dark:bg-[#0a0e1a] transition-colors duration-300">
-            <div
-                aria-hidden
-                className="pointer-events-none absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full blur-3xl opacity-30"
-                style={{ background: "radial-gradient(circle, var(--brand-blue) 0%, transparent 70%)" }}
-            />
-            <div
-                aria-hidden
-                className="pointer-events-none absolute top-1/4 -right-32 h-[520px] w-[520px] rounded-full blur-3xl opacity-25"
-                style={{ background: "radial-gradient(circle, var(--brand-cyan) 0%, transparent 70%)" }}
-            />
-            <div
-                aria-hidden
-                className="pointer-events-none absolute bottom-0 left-1/4 h-[320px] w-[320px] rounded-full blur-3xl opacity-20"
-                style={{ background: "radial-gradient(circle, var(--brand-lime) 0%, transparent 70%)" }}
-            />
+        <div className="relative w-full min-h-screen transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)' }}>
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-size-[50px_50px] opacity-50" />
 
             <div className="relative z-10 pt-32 pb-20 md:pt-40 md:pb-28">
                 <div className="w-[90%] md:w-[85%] mx-auto px-4 md:px-0">
+                    {/* Header */}
                     <motion.div
                         className="text-center space-y-6 mb-12"
                         variants={containerVariants}
@@ -96,30 +84,16 @@ const BrowseScreensPage = () => {
                         whileInView="visible"
                         viewport={{ once: true, margin: "-100px" }}
                     >
-                        <motion.span
-                            className="inline-flex items-center gap-2 rounded-full border border-base bg-surface/70 px-4 py-1.5 text-xs font-medium text-subtle backdrop-blur"
-                            variants={itemVariants}
-                        >
-                            <span className="h-2 w-2 rounded-full" style={{ background: "var(--brand-green)" }} />
-                            1,500+ premium screens across India
-                        </motion.span>
                         <motion.h1
-                            className="text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold heading-font tracking-tight text-base"
+                            className="text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold heading-font transition-colors duration-300"
+                            style={{ color: 'var(--text-primary)' }}
                             variants={headlineVariants}
                         >
-                            Browse{" "}
-                            <span
-                                className="bg-clip-text text-transparent"
-                                style={{
-                                    backgroundImage:
-                                        "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-green) 100%)",
-                                }}
-                            >
-                                Screens
-                            </span>
+                            Browse Screens
                         </motion.h1>
                         <motion.p
-                            className="text-base md:text-lg lg:text-xl max-w-3xl mx-auto px-4 md:px-0 text-muted"
+                            className="text-base md:text-lg lg:text-xl max-w-3xl mx-auto px-4 md:px-0 transition-colors duration-300"
+                            style={{ color: 'var(--text-secondary)' }}
                             variants={itemVariants}
                         >
                             Discover available digital screens across major cities. Book your campaign in minutes.
@@ -144,7 +118,14 @@ const BrowseScreensPage = () => {
                                 />
                             </div>
                             <button
-                                className="px-5 md:px-6 py-3 md:py-4 rounded-full font-semibold text-sm md:text-base border border-base bg-surface/70 text-base backdrop-blur transition hover:bg-elev flex items-center justify-center gap-2"
+                                className="px-5 md:px-6 py-3 md:py-4 rounded-lg font-semibold text-sm md:text-base backdrop-blur-md border transition-all duration-300 flex items-center justify-center gap-2"
+                                style={{
+                                    backgroundColor: 'var(--bg-card)',
+                                    borderColor: 'var(--border-primary)',
+                                    color: 'var(--text-primary)'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-accent)'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card)'}
                             >
                                 <Filter className="w-4 h-4 md:w-5 md:h-5" />
                                 Filter
@@ -279,7 +260,13 @@ const BrowseScreensPage = () => {
                                                 <Link
                                                     href={`/screens/${screen._id}`}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="brand-gradient-bg w-full md:w-auto px-5 md:px-6 py-2.5 md:py-3 rounded-full font-semibold text-xs md:text-sm text-white transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2"
+                                                    className="w-full md:w-auto px-5 md:px-6 py-2.5 md:py-3 rounded-lg font-semibold text-xs md:text-sm transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                                                    style={{
+                                                        backgroundColor: 'var(--text-primary)',
+                                                        color: 'var(--text-inverse)'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.95'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                                                 >
                                                     <Eye className="w-3 h-3 md:w-4 md:h-4" />
                                                     View

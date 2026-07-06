@@ -56,9 +56,9 @@ export const PaymentDialog = ({ open, onOpenChange, onSuccess }: PaymentDialogPr
             <>
               <div className="flex justify-center mb-4">
                 <div className="relative">
-                  <Loader2 className="w-16 h-16 text-[var(--brand-blue)] animate-spin" />
+                  <Loader2 className="w-16 h-16 text-purple-500 animate-spin" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-12 h-12 border-4 border-[var(--brand-blue)]/30 border-t-[var(--brand-blue)] rounded-full animate-spin" />
+                    <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
                   </div>
                 </div>
               </div>

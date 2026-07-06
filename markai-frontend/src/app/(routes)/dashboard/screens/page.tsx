@@ -711,8 +711,8 @@ const ScreensPage = () => {
                     <TableRow key={screen._id} className="transition-colors duration-300" style={{ borderColor: 'var(--border-primary)' }}>
                       <TableCell className="font-medium transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-[var(--brand-blue)]/15 flex items-center justify-center shrink-0">
-                            <Monitor className="w-5 h-5 text-[var(--brand-blue)]" />
+                          <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
+                            <Monitor className="w-5 h-5 text-purple-400" />
                           </div>
                           <div>
                             <div className="font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>{screenName}</div>

@@ -76,7 +76,7 @@ export const ScreenGallery = ({ screen, activeImage, setActiveImage }: ScreenGal
             className="flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur transition-colors duration-300"
             style={{ backgroundColor: 'var(--bg-primary)' }}
           >
-            <Play className="w-4 h-4 text-[var(--brand-blue)]" />
+            <Play className="w-4 h-4 text-purple-300" />
             <span
               className="transition-colors duration-300"
               style={{ color: 'var(--text-secondary)' }}

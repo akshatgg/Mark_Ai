@@ -1,7 +1,7 @@
 import { apiUrl, xiboUrl, XIBO_CLIENT_ID, XIBO_CLIENT_SECRET } from "@/utility/apiUrl";
 
 // Use backend API for Xibo operations (recommended for security)
-const BACKEND_API = apiUrl || "https://mainbackend.mark-ai.tech"
+const BACKEND_API = apiUrl || "https://api.mark-ai.tech/api"
 const XIBO_DIRECT_URL = xiboUrl || "https://saas.screenox.in";
 
 // Types based on Xibo API

@@ -386,16 +386,16 @@ const ScreensDetailedPage = () => {
 
   if (loading) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0e1a] text-base">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--brand-blue)" }} />
+      <div className="relative min-h-screen flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+        <Loader2 className="w-8 h-8 animate-spin transition-colors duration-300" style={{ color: 'var(--text-primary)' }} />
       </div>
     );
   }
 
   if (!screen) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0e1a] text-base">
-        <p className="text-muted">Screen not found</p>
+      <div className="relative min-h-screen flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+        <p className="transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>Screen not found</p>
       </div>
     );
   }
@@ -517,38 +517,21 @@ const ScreensDetailedPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white dark:bg-[#0a0e1a] transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full blur-3xl opacity-30"
-        style={{ background: "radial-gradient(circle, var(--brand-blue) 0%, transparent 70%)" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute top-1/3 -right-32 h-[520px] w-[520px] rounded-full blur-3xl opacity-25"
-        style={{ background: "radial-gradient(circle, var(--brand-cyan) 0%, transparent 70%)" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 left-1/3 h-[320px] w-[320px] rounded-full blur-3xl opacity-20"
-        style={{ background: "radial-gradient(circle, var(--brand-lime) 0%, transparent 70%)" }}
-      />
+    <div className="relative min-h-screen transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%)] opacity-70 dark:opacity-70 light:opacity-30" />
 
       <div className="relative z-10 w-[92%] md:w-[85%] mx-auto pt-28 pb-20 space-y-10">
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-4 text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
           <Link
             href="/browse-screens"
-            className="inline-flex items-center gap-2 rounded-full border border-base bg-surface/70 px-4 py-1.5 text-sm font-medium text-subtle backdrop-blur transition hover:bg-elev"
+            className="inline-flex items-center gap-2 transition-colors duration-300 hover:opacity-80"
+            style={{ color: 'var(--text-tertiary)' }}
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }} />
             Back to Browse
           </Link>
-          {city && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-base bg-surface/70 px-4 py-1.5 text-xs font-medium text-subtle backdrop-blur">
-              <span className="h-2 w-2 rounded-full" style={{ background: "var(--brand-green)" }} />
-              {city}
-            </span>
-          )}
+          <span className="transition-colors duration-300" style={{ color: 'var(--text-muted)' }}>/</span>
+          <span className="transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>{city}</span>
         </div>
 
         <div className="grid lg:grid-cols-12 gap-10">
@@ -580,7 +563,7 @@ const ScreensDetailedPage = () => {
 
           {/* Right column */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="rounded-3xl border border-base bg-surface/80 p-6 space-y-6 shadow-xl shadow-black/5 backdrop-blur-sm transition-colors duration-300">
+            <div className="rounded-3xl border p-6 space-y-6 transition-colors duration-300" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-card)' }}>
               {isAdmin ? (
                 <EditableScreenOverview
                   screen={screenForComponents}
@@ -597,46 +580,51 @@ const ScreensDetailedPage = () => {
                 <ScreenOverviewCard screen={screenForComponents} />
               )}
 
-              <div className="rounded-2xl border border-base bg-elev p-4 space-y-2 transition-colors duration-300">
-                <p className="text-xs uppercase tracking-widest text-subtle">Estimated cost</p>
+              <div className="rounded-2xl border p-4 space-y-2 transition-colors duration-300" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+                <p className="text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>Estimated cost</p>
                 <div className="flex items-center gap-2">
-                  <p
-                    className="text-3xl font-bold bg-clip-text text-transparent"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-green) 100%)",
-                    }}
-                  >
+                  <p className="text-3xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
                     {formatPrice(currentRate.price, currency)}
                   </p>
                   {currentRate.discount_percent > 0 && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-green-500/15 text-green-500 border border-green-500/30">
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
                       Save {currentRate.discount_percent}%
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-subtle">
+                <p className="text-xs transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
                   per {FREQUENCY_UNIT_LABELS[selectedFrequency]}
                 </p>
+            
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs uppercase tracking-widest text-subtle">
+                <p className="text-sm uppercase tracking-widest transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
                   Duration
                 </p>
                 <Select
                   value={selectedFrequency}
                   onValueChange={(value: PricingFrequency) => setSelectedFrequency(value)}
                 >
-                  <SelectTrigger className="w-full h-12 rounded-2xl border border-base bg-surface text-base transition hover:bg-elev">
+                  <SelectTrigger className="w-full h-12 rounded-2xl border transition-colors duration-300 hover:opacity-80" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}>
                     <SelectValue placeholder="Select duration" />
                   </SelectTrigger>
-                  <SelectContent className="border-base bg-surface text-base">
-                    <SelectItem value="hourly">Per Hour</SelectItem>
-                    <SelectItem value="daily">Per Day</SelectItem>
-                    <SelectItem value="weekly">Per Week</SelectItem>
-                    <SelectItem value="fortnightly">Per Fortnight</SelectItem>
-                    <SelectItem value="monthly">Per Month</SelectItem>
+                  <SelectContent className="transition-colors duration-300" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+                    <SelectItem value="hourly" className="transition-colors duration-300 hover:opacity-80" style={{ color: 'var(--text-primary)' }}>
+                      Per Hour
+                    </SelectItem>
+                    <SelectItem value="daily" className="transition-colors duration-300 hover:opacity-80" style={{ color: 'var(--text-primary)' }}>
+                      Per Day
+                    </SelectItem>
+                    <SelectItem value="weekly" className="transition-colors duration-300 hover:opacity-80" style={{ color: 'var(--text-primary)' }}>
+                      Per Week
+                    </SelectItem>
+                    <SelectItem value="fortnightly" className="transition-colors duration-300 hover:opacity-80" style={{ color: 'var(--text-primary)' }}>
+                      Per Fortnight
+                    </SelectItem>
+                    <SelectItem value="monthly" className="transition-colors duration-300 hover:opacity-80" style={{ color: 'var(--text-primary)' }}>
+                      Per Month
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -656,17 +644,20 @@ const ScreensDetailedPage = () => {
                 <button
                   onClick={() => {
                     if (user) {
+                      // User is logged in, navigate directly to booking page
                       router.push(`/screens/${idParam}/book-campaign`);
                     } else {
+                      // User is not logged in, show login dialog
                       setShowLoginDialog(true);
                     }
                   }}
-                  className="group w-full rounded-full py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
+                  className="w-full rounded-2xl py-4 text-lg font-semibold shadow-lg transition-all duration-300 hover:-translate-y-0.5"
                   style={{
-                    background:
-                      "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                    boxShadow: "0 12px 30px -10px rgba(47, 86, 224, 0.5)",
+                    backgroundColor: 'var(--text-primary)',
+                    color: 'var(--text-inverse)'
                   }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.95'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                 >
                   Start Campaign
                 </button>

@@ -1,282 +1,180 @@
 "use client";
-import React from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { ArrowRight, MapPin } from "lucide-react";
+import React from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { containerVariants, itemVariants, headlineVariants, statusDotVariants } from '@/utility/animations';
 
 const HeroSection = () => {
-  return (
-    <section className="relative w-full overflow-hidden bg-white dark:bg-[#0a0e1a] pt-28 pb-20 md:pt-32 md:pb-28">
-      <div
-        aria-hidden
-        className="absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full blur-3xl opacity-30"
-        style={{ background: "radial-gradient(circle, var(--brand-blue) 0%, transparent 70%)" }}
-      />
-      <div
-        aria-hidden
-        className="absolute -bottom-40 -right-32 h-[520px] w-[520px] rounded-full blur-3xl opacity-25"
-        style={{ background: "radial-gradient(circle, var(--brand-cyan) 0%, transparent 70%)" }}
-      />
-      <div
-        aria-hidden
-        className="absolute top-1/3 right-1/4 h-[280px] w-[280px] rounded-full blur-3xl opacity-20"
-        style={{ background: "radial-gradient(circle, var(--brand-lime) 0%, transparent 70%)" }}
-      />
+    const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
 
-      <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 lg:grid-cols-2 lg:gap-16">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="relative"
-        >
-          <span
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 px-4 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 backdrop-blur"
-          >
-            <span className="h-2 w-2 rounded-full" style={{ background: "var(--brand-green)" }} />
-            India&apos;s Premium DOOH Network
-          </span>
+    // List of background images
+    const backgroundImages = [
+        '/backgroundnew.jpeg',
+        '/bg3.png',
+    ];
 
-          <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight text-gray-900 dark:text-white md:text-6xl lg:text-[64px]">
-            Transform your brand with{" "}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{
-                backgroundImage:
-                  "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-green) 100%)",
-              }}
-            >
-              creative DOOH
-            </span>{" "}
-            advertising.
-          </h1>
+    // Auto-advance slider every 5 seconds
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % backgroundImages.length);
+        }, 5000);
 
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted">
-            Mark AI puts your campaigns on 1,500+ premium digital screens across 56
-            Indian cities — book, launch, and measure in minutes.
-          </p>
+        return () => clearInterval(interval);
+    }, [backgroundImages.length]);
 
-          <div className="mt-8 flex flex-wrap items-center gap-4">
-            <Link
-              href="/browse-screens"
-              className="group inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl"
-              style={{
-                background:
-                  "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                boxShadow: "0 12px 30px -10px rgba(47, 86, 224, 0.5)",
-              }}
-            >
-              Browse screens
-              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 rounded-full border border-base bg-surface px-7 py-3.5 text-sm font-semibold text-base transition hover:bg-elev"
-            >
-              Talk to sales
-            </Link>
-          </div>
-
-          <div className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t divider-base pt-8">
-            {[
-              { value: "1500+", label: "Screens" },
-              { value: "56", label: "Cities" },
-              { value: "10Cr+", label: "Daily reach" },
-            ].map((s) => (
-              <div key={s.label}>
-                <div
-                  className="text-2xl font-bold md:text-3xl bg-clip-text text-transparent"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                  }}
+    return (
+        <div className="relative w-full h-screen overflow-hidden">
+            {/* Full-screen background image slider */}
+            {backgroundImages.map((imageSrc, index) => (
+                <motion.div
+                    key={imageSrc}
+                    className="absolute inset-0 w-full h-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: currentImageIndex === index ? 1 : 0 }}
+                    transition={{ duration: 1 }}
                 >
-                  {s.value}
-                </div>
-                <div className="mt-1 text-xs uppercase tracking-wider text-subtle">
-                  {s.label}
-                </div>
-              </div>
+                    <Image
+                        src={imageSrc}
+                        alt={`Background ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        priority={index === 0}
+                        quality={90}
+                    />
+                </motion.div>
             ))}
-          </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-          className="relative h-[520px] w-full [perspective:1200px]"
-        >
-          <motion.div
-            aria-hidden
-            className="absolute inset-0 -z-10"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 40, ease: "linear", repeat: Infinity }}
-            style={{
-              background:
-                "conic-gradient(from 0deg, transparent 0deg, rgba(47,86,224,0.18) 60deg, transparent 120deg, rgba(31,196,207,0.18) 200deg, transparent 260deg, rgba(79,184,79,0.18) 320deg, transparent 360deg)",
-              filter: "blur(60px)",
-              borderRadius: "50%",
-            }}
-          />
-
-          <motion.div
-            initial={{ opacity: 0, x: 40, rotate: 8 }}
-            animate={{ opacity: 1, x: 0, rotate: 3 }}
-            transition={{ duration: 0.8, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ rotate: 0, scale: 1.04, y: -8, transition: { duration: 0.4 } }}
-            className="absolute right-0 top-0 h-72 w-56 md:h-80 md:w-64 [transform-style:preserve-3d]"
-          >
+            {/* Gradient overlay - dark mode */}
             <motion.div
-              className="relative h-full w-full overflow-hidden rounded-3xl shadow-2xl ring-base"
-              animate={{ y: [0, -14, 0] }}
-              transition={{ duration: 6, ease: "easeInOut", repeat: Infinity }}
-            >
-              <Image
-                src="/screen_in_blr/screen1.jpg"
-                alt="Digital screen"
-                fill
-                className="object-cover"
-                priority
-              />
-              <motion.div
-                aria-hidden
-                className="absolute inset-0"
+                className="dark:block hidden absolute inset-0 z-10 backdrop-blur-sm"
                 style={{
-                  background:
-                    "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
+                    maskImage: 'linear-gradient(to right, black, black 40%, transparent 80%)',
+                    WebkitMaskImage: 'linear-gradient(to right, black, black 40%, transparent 80%)'
                 }}
-                animate={{ x: ["-120%", "120%"] }}
-                transition={{ duration: 3.5, ease: "easeInOut", repeat: Infinity, repeatDelay: 2 }}
-              />
-            </motion.div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: -40, rotate: -8 }}
-            animate={{ opacity: 1, x: 0, rotate: -4 }}
-            transition={{ duration: 0.8, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ rotate: 0, scale: 1.04, y: -8, transition: { duration: 0.4 } }}
-            className="absolute left-0 top-16 h-64 w-52 md:h-72 md:w-60 [transform-style:preserve-3d]"
-          >
-            <motion.div
-              className="relative h-full w-full overflow-hidden rounded-3xl shadow-2xl ring-base"
-              animate={{ y: [0, 16, 0] }}
-              transition={{ duration: 7, ease: "easeInOut", repeat: Infinity, delay: 0.5 }}
-            >
-              <Image
-                src="/screen_in_blr/screen2.webp"
-                alt="Digital screen"
-                fill
-                className="object-cover"
-              />
-              <motion.div
-                aria-hidden
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
-                }}
-                animate={{ x: ["-120%", "120%"] }}
-                transition={{ duration: 3.5, ease: "easeInOut", repeat: Infinity, repeatDelay: 3, delay: 1.5 }}
-              />
-            </motion.div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 50, rotate: 6 }}
-            animate={{ opacity: 1, y: 0, rotate: 2 }}
-            transition={{ duration: 0.8, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ rotate: 0, scale: 1.04, y: -8, transition: { duration: 0.4 } }}
-            className="absolute bottom-0 right-8 h-64 w-64 md:h-72 md:w-72 [transform-style:preserve-3d]"
-          >
-            <motion.div
-              className="relative h-full w-full overflow-hidden rounded-3xl shadow-2xl ring-base"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 5.5, ease: "easeInOut", repeat: Infinity, delay: 1 }}
-            >
-              <Image
-                src="/screen_in_blr/screen3.webp"
-                alt="Digital screen"
-                fill
-                className="object-cover"
-              />
-              <motion.div
-                aria-hidden
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
-                }}
-                animate={{ x: ["-120%", "120%"] }}
-                transition={{ duration: 3.5, ease: "easeInOut", repeat: Infinity, repeatDelay: 2.5, delay: 0.8 }}
-              />
-            </motion.div>
-          </motion.div>
-
-          {[
-            { top: "8%", left: "42%", size: 6, color: "var(--brand-blue)", delay: 0 },
-            { top: "55%", left: "5%", size: 4, color: "var(--brand-cyan)", delay: 0.8 },
-            { top: "80%", left: "48%", size: 5, color: "var(--brand-green)", delay: 1.4 },
-            { top: "30%", left: "92%", size: 4, color: "var(--brand-lime)", delay: 2 },
-          ].map((p, i) => (
-            <motion.span
-              key={i}
-              aria-hidden
-              className="absolute rounded-full"
-              style={{
-                top: p.top,
-                left: p.left,
-                width: p.size,
-                height: p.size,
-                background: p.color,
-                boxShadow: `0 0 16px ${p.color}`,
-              }}
-              animate={{ y: [0, -22, 0], opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 4, repeat: Infinity, delay: p.delay, ease: "easeInOut" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.8 }}
             />
-          ))}
-
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.85, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="absolute bottom-6 left-0 z-10 flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 shadow-xl ring-base"
-          >
+            {/* Light mode blur layer - from left to right */}
             <motion.div
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl"
-              style={{
-                background:
-                  "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-              }}
-              animate={{ scale: [1, 1.08, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <motion.span
-                aria-hidden
-                className="absolute inset-0 rounded-xl"
+                className="dark:hidden block absolute inset-0 z-10 backdrop-blur-md"
                 style={{
-                  background:
-                    "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
+                    maskImage: 'linear-gradient(to right, black, black 40%, transparent 80%)',
+                    WebkitMaskImage: 'linear-gradient(to right, black, black 40%, transparent 80%)'
                 }}
-                animate={{ scale: [1, 1.6], opacity: [0.5, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
-              />
-              <MapPin className="relative h-5 w-5 text-white" />
-            </motion.div>
-            <div>
-              <div className="text-xs text-subtle">Live in</div>
-              <div className="text-sm font-semibold text-base">
-                Bengaluru · Mumbai · Delhi
-              </div>
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.8 }}
+            />
+
+            {/* Content container */}
+            <div className="relative w-[85%] mx-auto z-20 h-full flex items-center">
+                <div className="mx-auto w-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
+                        {/* Left Section - Content */}
+                        <motion.div
+                            className="space-y-5 transition-colors duration-300"
+                            // style={{ color: 'var(--text-primary)' }}
+                            variants={containerVariants}
+                            initial="hidden"
+                            animate="visible"
+                        >
+                            {/* Status Indicator */}
+                            <motion.div
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-lg transition-colors duration-300 border-2 border-white/30"
+                                variants={itemVariants}
+                                whileHover={{ scale: 1.05 }}
+                                transition={{ type: "spring", stiffness: 300 }}
+                            >
+                                <motion.div
+                                    className="w-2 h-2 rounded-full bg-green-500"
+                                    variants={statusDotVariants}
+                                    animate="animate"
+                                />
+                                <span className="text-sm font-semibold text-white">Self-service. No contracts. No commitments.</span>
+                            </motion.div>
+
+                            {/* Headline */}
+                            <motion.h1
+                                className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight heading-font transition-colors duration-300 text-white"
+                                style={{
+                                    // transformStyle: "preserve-3d",
+                                    textShadow: "0 10px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(168, 85, 247, 0.1), 0 5px 15px rgba(0, 0, 0, 0.4)",
+                                    // letterSpacing: "0.02em",
+                                }}
+                                variants={headlineVariants}
+                            >
+                                Buy outdoor ads in minutes, from one browser.
+                            </motion.h1>
+
+                            {/* Description */}
+                            <motion.div
+                                className="text-lg font-medium md:text-xl leading-relaxed max-w-2xl transition-colors duration-300 text-white"
+                                variants={itemVariants}
+                            >
+                                {/* <p className='mb-2'>
+                                    Find digital billboards, set your budget, upload your creative, and launch.
+                                </p> */}
+                                <p className='font-black w-fit mb-2 uppercase bg-green-600 text-xl text-white p-1'>No long contracts. No minimum spend.
+                                </p>
+
+                                {/* <p>
+                                    For brands and agencies in India. Plan, book, and track DOOH campaigns on one simple dashboard.
+                                </p> */}
+                            </motion.div>
+
+
+                            {/* Action Buttons */}
+                            <motion.div
+                                className="flex flex-wrap items-center gap-4 pt-4"
+                                variants={itemVariants}
+                            >
+                                <motion.div
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                                >
+                                    <Link
+                                        href="/auth/login"
+                                        className={cn(
+                                            "px-10 py-3 rounded-lg font-semibold text-black bg-white text-lg",
+                                            "transition-all duration-200",
+                                            "shadow-lg hover:shadow-xl",
+                                            "block text-center"
+                                        )}
+
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.opacity = '0.9';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.opacity = '1';
+                                        }}
+                                    >
+                                        Advertise
+                                    </Link>
+                                </motion.div>
+
+                            </motion.div>
+                        </motion.div>
+
+
+                    </div>
+                </div>
             </div>
-          </motion.div>
-        </motion.div>
-      </div>
-    </section>
-  );
+
+            {/* Subtle star/dust effect overlay */}
+            <motion.div
+                className="absolute inset-0 z-10 pointer-events-none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 1.5, delay: 0.8 }}
+            >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-size-[50px_50px] opacity-30" />
+            </motion.div>
+        </div>
+    );
 };
 
 export default HeroSection;

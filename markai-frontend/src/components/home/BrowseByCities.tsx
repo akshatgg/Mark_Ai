@@ -1,206 +1,153 @@
 "use client";
-import React from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { ArrowUpRight, MapPin } from "lucide-react";
-
-type City = {
-  name: string;
-  tagline: string;
-  image: string;
-  status: "live" | "coming-soon";
-  screens?: string;
-  locations?: string;
-};
-
-const cities: City[] = [
-  {
-    name: "Bengaluru",
-    tagline: "Silicon Valley of India",
-    image: "/cities/beng.jpg",
-    status: "live",
-    screens: "50+",
-    locations: "25+",
-  },
-  {
-    name: "Mumbai",
-    tagline: "City of Dreams",
-    image: "/cities/mumbai.avif",
-    status: "coming-soon",
-  },
-  {
-    name: "Delhi",
-    tagline: "Heart of the Nation",
-    image: "/cities/delhi.webp",
-    status: "coming-soon",
-  },
-  {
-    name: "Hyderabad",
-    tagline: "City of Pearls",
-    image: "/cities/hyd.jpg",
-    status: "coming-soon",
-  },
-  {
-    name: "Chennai",
-    tagline: "Gateway to South India",
-    image: "/cities/chennai.png",
-    status: "coming-soon",
-  },
-];
+import React from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { MapPin, ArrowRight, Building2, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { containerVariants, itemVariants, headlineVariants } from '@/utility/animations';
 
 const BrowseByCities = () => {
-  return (
-    <section className="relative w-full bg-base py-20 md:py-28">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-          <div className="max-w-2xl">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">
-              Coverage
+    return (
+        <section className="relative w-full py-10 overflow-hidden transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)' }}>
+            {/* Grid pattern background */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-size-[50px_50px]" />
+            {/* Theme-aware gradient backgrounds - only visible in dark mode */}
+            <div className="dark:block hidden absolute inset-0">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(123,67,255,0.25),transparent_55%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(139,92,246,0.1),transparent)]" />
             </div>
-            <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-base md:text-5xl">
-              Operating across{" "}
-              <span
-                className="bg-clip-text text-transparent"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                }}
-              >
-                India&apos;s biggest markets
-              </span>
-              .
-            </h2>
-            <p className="mt-4 text-lg text-muted">
-              Live in Bengaluru today. Mumbai, Delhi and Hyderabad rolling out
-              next — get on the early-access list.
-            </p>
-          </div>
-          <Link
-            href="/browse-screens"
-            className="inline-flex items-center gap-2 rounded-full border border-base bg-surface px-5 py-2.5 text-sm font-semibold text-base transition hover:bg-elev"
-          >
-            View all screens
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-        </div>
-
-        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {cities.map((city, i) => (
-            <CityCard key={city.name} city={city} index={i} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const CityCard = ({ city, index }: { city: City; index: number }) => {
-  const live = city.status === "live";
-  const Wrapper: React.ElementType = live ? Link : "div";
-  const wrapperProps = live
-    ? { href: `/browse-screens?city=${city.name}` }
-    : {};
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.5, delay: index * 0.05 }}
-      className={
-        live
-          ? "sm:col-span-2 lg:row-span-2 lg:col-span-2"
-          : ""
-      }
-    >
-      <Wrapper
-        {...wrapperProps}
-        className={`group block h-full overflow-hidden rounded-3xl ring-base transition ${
-          live
-            ? "shadow-xl hover:-translate-y-1 hover:shadow-2xl"
-            : "shadow-sm hover:shadow-md"
-        }`}
-      >
-        <div
-          className={`relative w-full overflow-hidden ${
-            live ? "aspect-[4/3] lg:aspect-auto lg:h-full lg:min-h-[460px]" : "aspect-[4/3]"
-          }`}
-        >
-          <Image
-            src={city.image}
-            alt={city.name}
-            fill
-            className={`object-cover transition duration-700 ${
-              live ? "group-hover:scale-105" : "scale-100 brightness-95 group-hover:brightness-100"
-            }`}
-          />
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-
-          <div className="absolute top-4 left-4">
-            {live ? (
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white shadow"
-                style={{
-                  background:
-                    "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                }}
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
-                </span>
-                Live now
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-700 backdrop-blur">
-                Coming soon
-              </span>
-            )}
-          </div>
-
-          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
-            <div className="flex items-end justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-white">
-                  <MapPin className="h-4 w-4 opacity-80" />
-                  <span className="text-xs uppercase tracking-wider opacity-80">
-                    {city.tagline}
-                  </span>
-                </div>
-                <h3
-                  className={`mt-1 font-bold text-white ${
-                    live ? "text-3xl md:text-5xl" : "text-2xl md:text-3xl"
-                  }`}
+            <div className="relative z-10 w-[90%] md:w-[85%] mx-auto">
+                {/* Header */}
+                <motion.div
+                    className="text-center mb-12 md:mb-16"
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
                 >
-                  {city.name}
-                </h3>
-              </div>
-              {live && (
-                <ArrowUpRight className="h-7 w-7 shrink-0 text-white transition group-hover:rotate-12" />
-              )}
+                    <motion.div variants={headlineVariants}>
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold heading-font mb-4 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                            Now Available in Bengaluru
+                        </h2>
+                        <p className="text-lg md:text-xl max-w-2xl mx-auto transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
+                            India's tech capital, where innovation meets opportunity
+                        </p>
+                    </motion.div>
+                </motion.div>
+
+                {/* Featured Bengaluru Card */}
+                <motion.div
+                    variants={itemVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-50px" }}
+                    className="max-w-7xl mx-auto"
+                >
+                    <Link href="/browse-screens?city=Bengaluru" className="block group">
+                        <motion.div
+                            whileHover={{ y: -8 }}
+                            transition={{ type: "spring", stiffness: 300 }}
+                            className={cn(
+                                "relative rounded-3xl overflow-hidden backdrop-blur-md",
+                                "lg:grid lg:grid-cols-2",
+                                "transition-all duration-300"
+                            )}
+                            style={{
+                                backgroundColor: 'var(--bg-card)',
+                                borderColor: 'var(--border-primary)',
+                                borderWidth: '1px',
+                                borderStyle: 'solid'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = 'var(--border-secondary)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = 'var(--border-primary)';
+                            }}
+                        >
+                            {/* Image Section */}
+                            <div className="relative h-[300px] md:h-[400px] lg:h-full overflow-hidden">
+                                <Image
+                                    src="/cities/beng.jpg"
+                                    alt="Bengaluru"
+                                    fill
+                                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                                    quality={90}
+                                />
+
+                                {/* Gradient Overlay */}
+                                <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+
+                                {/* Floating Badge */}
+                                <div className="absolute top-6 left-6">
+                                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 backdrop-blur-md border border-purple-500/30 text-purple-300 text-sm font-semibold transition-colors duration-300">
+                                        <Sparkles className="w-4 h-4" />
+                                        Now Live
+                                    </span>
+                                </div>
+
+                                {/* City Name Overlay - Always white text over dark image */}
+                                <div className="absolute bottom-6 left-6 right-6">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <MapPin className="w-6 h-6 text-white" />
+                                        <h3 className="text-3xl md:text-5xl font-bold heading-font text-white">
+                                            Bengaluru
+                                        </h3>
+                                    </div>
+                                    <p className="text-sm md:text-base text-white/80">
+                                        Silicon Valley of India • Tech Hub • Garden City
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Section */}
+                            <div className="p-6 md:p-8">
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
+                                    <div className="text-center p-4 rounded-xl transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)', borderWidth: '1px', borderStyle: 'solid' }}>
+                                        <Building2 className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                                        <p className="text-2xl md:text-3xl font-bold mb-1 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>50+</p>
+                                        <p className="text-xs md:text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>Digital Screens</p>
+                                    </div>
+                                    <div className="text-center p-4 rounded-xl transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)', borderWidth: '1px', borderStyle: 'solid' }}>
+                                        <MapPin className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                                        <p className="text-2xl md:text-3xl font-bold mb-1 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>25+</p>
+                                        <p className="text-xs md:text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>Prime Locations</p>
+                                    </div>
+                                    <div className="col-span-2 md:col-span-1 text-center p-4 rounded-xl transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)', borderWidth: '1px', borderStyle: 'solid' }}>
+                                        <Sparkles className="w-6 h-6 text-green-400 mx-auto mb-2" />
+                                        <p className="text-2xl md:text-3xl font-bold mb-1 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>24/7</p>
+                                        <p className="text-xs md:text-sm transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>Live Campaigns</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 md:p-6 rounded-xl bg-purple-500/10 border border-purple-500/20 transition-colors duration-300">
+                                    <div className="flex-1">
+                                        <p className="font-semibold mb-1 text-base md:text-lg transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Explore screens in Bengaluru</p>
+                                        <p className="text-sm md:text-base transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>Start your campaign today</p>
+                                    </div>
+                                    <ArrowRight className="w-6 h-6 md:w-8 md:h-8 group-hover:translate-x-2 transition-all duration-300 shrink-0" style={{ color: 'var(--text-primary)' }} />
+                                </div>
+                            </div>
+                        </motion.div>
+                    </Link>
+                </motion.div>
+
+                {/* Coming Soon Message */}
+                <motion.div
+                    variants={itemVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true }}
+                    className="mt-12 text-center"
+                >
+                    <p className="text-sm md:text-base transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
+                        More cities coming soon • Stay tuned for Mumbai, Delhi, Hyderabad & Chennai
+                    </p>
+                </motion.div>
             </div>
-
-            {live && (
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Stat label="Screens" value={city.screens!} />
-                <Stat label="Prime locations" value={city.locations!} />
-                <Stat label="Live campaigns" value="24/7" />
-              </div>
-            )}
-          </div>
-        </div>
-      </Wrapper>
-    </motion.div>
-  );
+        </section>
+    );
 };
-
-const Stat = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-white backdrop-blur-md">
-    <span className="text-sm font-bold">{value}</span>
-    <span className="ml-1.5 text-xs opacity-80">{label}</span>
-  </div>
-);
 
 export default BrowseByCities;

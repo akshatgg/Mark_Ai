@@ -134,15 +134,14 @@ export const ScreenSelector: React.FC<ScreenSelectorProps> = ({
                 onClick={() => onSelectAll(filteredScreens)}
                 disabled={loading || filteredScreens.length === 0}
                 className={cn(
-                  "w-full mt-3 py-2.5 px-4 rounded-full text-sm font-semibold text-white",
-                  "transition-all duration-300 shadow-lg hover:-translate-y-0.5 hover:shadow-xl",
+                  "w-full mt-3 py-2.5 px-4 rounded-lg text-sm font-medium",
+                  "bg-linear-to-r from-purple-600 to-purple-500",
+                  "hover:from-purple-500 hover:to-purple-400",
+                  "transition-all duration-300",
                   "disabled:opacity-50 disabled:cursor-not-allowed",
                   "flex items-center justify-center gap-2"
                 )}
-                style={{
-                  background: "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                  boxShadow: "0 12px 30px -10px rgba(47, 86, 224, 0.5)",
-                }}
+                style={{ color: 'var(--text-primary)' }}
               >
                 <Check className="w-4 h-4" />
                 {selectedScreenIds.size === filteredScreens.length && filteredScreens.length > 0
@@ -155,7 +154,7 @@ export const ScreenSelector: React.FC<ScreenSelectorProps> = ({
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--brand-blue)" }} />
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
                 </div>
               ) : filteredScreens.length === 0 ? (
                 <div className="text-center py-12">
@@ -185,7 +184,7 @@ export const ScreenSelector: React.FC<ScreenSelectorProps> = ({
                         "relative rounded-xl overflow-hidden border transition-all duration-300 cursor-pointer",
                         "backdrop-blur-md",
                         isSelected
-                          ? "border-[var(--brand-blue)] shadow-lg shadow-[var(--brand-blue)]/20"
+                          ? "border-purple-500 shadow-lg shadow-purple-500/20"
                           : "",
                         isCurrent && "ring-2 ring-blue-500"
                       )}
@@ -199,8 +198,7 @@ export const ScreenSelector: React.FC<ScreenSelectorProps> = ({
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             exit={{ scale: 0 }}
-                            className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center"
-                            style={{ background: "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)" }}
+                            className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center"
                           >
                             <Check className="w-4 h-4 text-white" />
                           </motion.div>
@@ -261,13 +259,12 @@ export const ScreenSelector: React.FC<ScreenSelectorProps> = ({
               <button
                 onClick={onClose}
                 className={cn(
-                  "w-full px-6 py-3 rounded-full font-semibold text-sm text-white",
-                  "transition-all duration-300 shadow-lg hover:-translate-y-0.5 hover:shadow-xl"
+                  "w-full px-6 py-3 rounded-lg font-semibold text-sm",
+                  "bg-linear-to-r from-purple-600 to-pink-600",
+                  "hover:from-purple-700 hover:to-pink-700",
+                  "transition-all duration-300 shadow-lg hover:shadow-xl"
                 )}
-                style={{
-                  background: "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                  boxShadow: "0 12px 30px -10px rgba(47, 86, 224, 0.5)",
-                }}
+                style={{ color: 'var(--text-primary)' }}
               >
                 Continue with {selectedCount} Screen{selectedCount !== 1 ? 's' : ''}
               </button>

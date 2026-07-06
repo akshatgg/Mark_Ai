@@ -49,7 +49,7 @@ export const TargetAudienceCard = ({ data }: TargetAudienceCardProps) => {
         {items.map(({ icon: Icon, label, text }) => (
           <div key={label} className="space-y-1">
             <div className="flex items-center gap-2">
-              <Icon className="w-4 h-4 text-[var(--brand-blue)]" />
+              <Icon className="w-4 h-4 text-purple-400" />
               <span
                 className="font-medium transition-colors duration-300"
                 style={{ color: 'var(--text-secondary)' }}

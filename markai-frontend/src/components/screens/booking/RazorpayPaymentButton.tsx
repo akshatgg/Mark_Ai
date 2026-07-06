@@ -86,8 +86,7 @@ export const RazorpayPaymentButton = ({
           },
         },
         theme: {
-          // Brand blue — mirrors --brand-blue in theme.css (Razorpay only accepts hex strings)
-          color: "#2f56e0",
+          color: "#7B43FF",
         },
       };
 

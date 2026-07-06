@@ -237,7 +237,7 @@ export const StartCampaignDialog = ({ open, onOpenChange, screenId }: StartCampa
             <div className="flex items-center justify-between text-sm">
               <Link
                 href="/auth/forgot-password"
-                className="text-[var(--brand-blue)] hover:text-[var(--brand-cyan)] transition-colors duration-300"
+                className="text-purple-300 hover:text-purple-200 transition-colors duration-300"
               >
                 Forgot password?
               </Link>
@@ -299,7 +299,7 @@ export const StartCampaignDialog = ({ open, onOpenChange, screenId }: StartCampa
             <span>Not a user yet?</span>
             <Link
               href="/auth/signup"
-              className="inline-flex items-center gap-2 font-medium hover:text-[var(--brand-blue)] transition-colors duration-300"
+              className="inline-flex items-center gap-2 font-medium hover:text-purple-300 transition-colors duration-300"
               style={{ color: 'var(--text-primary)' }}
             >
               <UserPlus className="w-4 h-4" />

@@ -1,361 +1,615 @@
 "use client";
-import React from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { motion } from "framer-motion";
+import React from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
-  ShieldCheck,
-  Search,
-  Upload,
-  BarChart3,
-  Clock,
-  CheckCircle2,
-  TrendingUp,
-  MapPin,
-  Users,
-  Target,
-  ArrowRight,
-  ArrowUpRight,
-  Zap,
-  Check,
-  X,
-} from "lucide-react";
+    ShieldCheck, Zap, LineChart, Search, Upload, BarChart3,
+    Clock, CheckCircle2, TrendingUp, MapPin, Users, Target,
+    Phone, AlertCircle, Sparkles, ArrowRight
+} from 'lucide-react';
 
 const founders = [
-  {
-    name: "Danish Ashraf",
-    role: "CEO & Co-founder",
-    title: "10+ yrs digital advertising. Previously scaled DOOH networks.",
-    image: "/about/danish.jpeg",
-  },
-  {
-    name: "Poornima Murugiah",
-    role: "COO & Co-founder",
-    title: "Operations expert. Managed 200+ screen networks.",
-    image: "/about/poornima-p.jpeg",
-  },
+    {
+        name: "Danish Ashraf",
+        role: "CEO & Co-founder",
+        title: "10+ yrs digital advertising. Previously scaled DOOH networks.",
+        image: "/about/danish.jpeg"
+    },
+    {
+        name: "Poornima Murugiah",
+        role: "COO & Co-founder",
+        title: "Operations expert. Managed 200+ screen networks.",
+        image: "/about/poornima-p.jpeg"
+    }
 ];
 
 const steps = [
-  { number: "01", title: "Search screens", description: "Filter by city, audience and price.", icon: Search },
-  { number: "02", title: "Book hourly slots", description: "No minimums. Hour or year — your call.", icon: Clock },
-  { number: "03", title: "Upload creative", description: "Our team QAs it before going live.", icon: Upload },
-  { number: "04", title: "Track views", description: "Live impressions + proof-of-play.", icon: BarChart3 },
+    {
+        number: "1",
+        title: "Search screens",
+        description: "by city, audience, price",
+        icon: Search
+    },
+    {
+        number: "2",
+        title: "Book hourly slots",
+        description: "(no minimums)",
+        icon: Clock
+    },
+    {
+        number: "3",
+        title: "Upload creative",
+        description: "(we QA it)",
+        icon: Upload
+    },
+    {
+        number: "4",
+        title: "Track views",
+        description: "+ proof-of-play in dashboard",
+        icon: BarChart3
+    }
 ];
 
 const benefits = [
-  { title: "No contracts, no minimums", desc: "Book 1 hour or 1 year. Pay only for confirmed plays.", icon: CheckCircle2 },
-  { title: "Real proof-of-play", desc: "Escrow releases only after the screen operator confirms delivery.", icon: ShieldCheck },
-  { title: "Audience-matched screens", desc: "Verified venues with TG, views and category fit on every listing.", icon: Target },
-  { title: "RazorPay escrow", desc: "UPI, cards, wallets. Funds safe until your ad plays.", icon: Zap },
+    {
+        title: "No contracts, no minimums",
+        description: "Book 1 hour or 1 year. Pay only for confirmed plays.",
+        icon: CheckCircle2
+    },
+    {
+        title: "Real proof-of-play",
+        description: "Escrow releases only after screen operator confirms delivery.",
+        icon: ShieldCheck
+    },
+    {
+        title: "Audience-matched screens",
+        description: "30+ verified CCD venues. Each shows TG, views, and best categories.",
+        icon: Target
+    },
+    {
+        title: "RazorPay escrow",
+        description: "UPI, cards, wallets. Funds safe until your ad plays.",
+        icon: Zap
+    }
 ];
 
 const stats = [
-  { value: "30+", label: "Screens live in Bengaluru", icon: MapPin },
-  { value: "15,000+", label: "Weekly views per screen", icon: Users },
-  { value: "100%", label: "Proof-of-play verified", icon: CheckCircle2 },
-  { value: "25+", label: "Audience categories", icon: TrendingUp },
+    { value: "30", label: "Screens live in Bengaluru", icon: MapPin },
+    { value: "15,000+", label: "Weekly views per screen", icon: Users },
+    { value: "100%", label: "Proof-of-play verification", icon: CheckCircle2 },
+    { value: "25+", label: "Categories covered", icon: TrendingUp }
 ];
 
 const comparisonData = [
-  { feature: "Booking", traditional: "Phone / email", markai: "Browser, 2 mins" },
-  { feature: "Minimum spend", traditional: "₹50,000+", markai: "None" },
-  { feature: "Proof-of-play", traditional: "Manual logs", markai: "Automatic CMS" },
-  { feature: "Payment", traditional: "Invoice, 30 days", markai: "Escrow, pay-per-play" },
-  { feature: "Audience data", traditional: "None", markai: "Per-screen TG" },
+    { feature: "Booking", traditional: "Phone/email", markai: "Browser, 2 mins" },
+    { feature: "Minimum spend", traditional: "₹50,000+", markai: "None" },
+    { feature: "Proof-of-play", traditional: "Manual logs", markai: "Automatic CMS" },
+    { feature: "Payment", traditional: "Invoice 30 days", markai: "Escrow, pay-per-play" },
+    { feature: "Audience data", traditional: "None", markai: "Per screen TG" }
 ];
 
-const BRAND_GRAD = "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)";
-const BRAND_GRAD_FULL = "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-green) 100%)";
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: { staggerChildren: 0.15 }
+    }
+};
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0 },
+const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.5 }
+    }
 };
 
 const AboutSection = () => {
-  return (
-    <div className="w-full bg-base">
-      {/* Hero */}
-      <section className="relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-28">
+    return (
         <div
-          aria-hidden
-          className="absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full opacity-30 blur-3xl"
-          style={{ background: "radial-gradient(circle, var(--brand-blue) 0%, transparent 70%)" }}
-        />
-        <div
-          aria-hidden
-          className="absolute top-1/3 -right-32 h-[480px] w-[480px] rounded-full opacity-25 blur-3xl"
-          style={{ background: "radial-gradient(circle, var(--brand-cyan) 0%, transparent 70%)" }}
-        />
-
-        <div className="relative mx-auto max-w-4xl px-6 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-base bg-base/70 px-4 py-1.5 text-xs font-medium text-muted backdrop-blur">
-            <span className="h-2 w-2 rounded-full" style={{ background: "var(--brand-green)" }} />
-            About Mark AI
-          </span>
-          <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight text-base md:text-6xl lg:text-[64px]">
-            Built for brands.{" "}
-            <span className="bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD_FULL }}>
-              Powered by data.
-            </span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted">
-            Mark AI is the operating system for India&apos;s outdoor advertising — plan,
-            book and measure DOOH campaigns across 1,500+ premium screens, all from one
-            dashboard. No phone calls. No spreadsheets.
-          </p>
-
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/browse-screens"
-              className="group inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl"
-              style={{ background: BRAND_GRAD, boxShadow: "0 12px 30px -10px rgba(47, 86, 224, 0.5)" }}
-            >
-              Browse screens
-              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 rounded-full border border-base bg-surface px-7 py-3.5 text-sm font-semibold text-base transition hover:bg-elev"
-            >
-              Talk to sales
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats strip */}
-      <section className="relative bg-base pb-20">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="grid grid-cols-2 gap-4 rounded-3xl border border-subtle bg-elev p-6 shadow-sm md:grid-cols-4 md:p-10">
-            {stats.map((s, i) => {
-              const Icon = s.icon;
-              return (
-                <motion.div
-                  key={s.label}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true, margin: "-60px" }}
-                  variants={fadeUp}
-                  transition={{ duration: 0.4, delay: i * 0.06 }}
-                  className="flex flex-col gap-2 text-center md:text-left"
-                >
-                  <Icon className="mx-auto h-5 w-5 text-subtle md:mx-0" strokeWidth={1.5} />
-                  <div className="text-3xl font-bold text-base md:text-4xl">{s.value}</div>
-                  <div className="text-sm text-muted">{s.label}</div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Mission */}
-      <section className="bg-elev py-20 md:py-28">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 px-6 lg:grid-cols-2 lg:gap-20">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={fadeUp} transition={{ duration: 0.5 }}>
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Our mission</div>
-            <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-base md:text-5xl">
-              Make outdoor advertising{" "}
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD }}>
-                as easy as a Google Ad
-              </span>
-              .
-            </h2>
-            <p className="mt-6 text-lg leading-relaxed text-muted">
-              For 30 years, DOOH meant phone calls, lengthy negotiations and paperwork.
-              We&apos;re fixing that — bringing programmatic-style booking, real-time
-              measurement and audience-aware planning to every brand in India.
-            </p>
-            <ul className="mt-8 space-y-3 text-muted">
-              {[
-                "From discovery to live ad in under 24 hours",
-                "Every impression backed by proof-of-play",
-                "Audience targeting on real-world inventory",
-              ].map((b) => (
-                <li key={b} className="flex items-start gap-3">
-                  <span className="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: BRAND_GRAD }} />
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={fadeUp} transition={{ duration: 0.5, delay: 0.1 }} className="relative">
-            <div className="relative aspect-[4/5] w-full max-w-md overflow-hidden rounded-[2rem] shadow-2xl ring-base">
-              <Image src="/about_bg.jpg" alt="Mark AI" fill className="object-cover" />
+            className="relative w-full min-h-screen py-20 md:py-32 transition-colors duration-300"
+            style={{ backgroundColor: 'var(--bg-primary)' }}
+        >
+            {/* Grid pattern background */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-size-[50px_50px]" />
+            {/* Theme-aware gradient backgrounds */}
+            <div className="dark:block hidden absolute inset-0">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(123,67,255,0.25),transparent_55%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(139,92,246,0.1),transparent)]" />
             </div>
-            <div className="absolute -bottom-6 -right-2 rounded-2xl bg-base p-5 shadow-2xl ring-base md:-right-6" style={{ minWidth: 220 }}>
-              <div className="text-4xl font-extrabold bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD_FULL }}>
-                24 hrs
-              </div>
-              <div className="mt-1 text-sm font-medium text-muted">Brief to live ad</div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
 
-      {/* How it works */}
-      <section className="bg-base py-20 md:py-28">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">How it works</div>
-            <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-base md:text-5xl">
-              Four steps from{" "}
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD }}>
-                brief to billboard
-              </span>
-              .
-            </h2>
-          </div>
-
-          <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {steps.map((step, i) => {
-              const Icon = step.icon;
-              return (
+            <div className="relative z-10 w-[85%] mx-auto space-y-32">
+                {/* Hero Section */}
                 <motion.div
-                  key={step.title}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true, margin: "-80px" }}
-                  variants={fadeUp}
-                  transition={{ duration: 0.5, delay: i * 0.08 }}
-                  className="relative rounded-3xl border border-subtle bg-base p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    className="text-center space-y-8"
                 >
-                  <div className="text-xs font-bold tracking-[0.2em] text-faint">{step.number}</div>
-                  <Icon className="mt-4 h-7 w-7 text-base" strokeWidth={1.5} aria-hidden />
-                  <div aria-hidden className="mt-5 h-px w-10 bg-gray-200" />
-                  <h3 className="mt-4 text-lg font-bold text-base">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">{step.description}</p>
+                    <div className="space-y-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.5 }}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-lg transition-colors duration-300 border"
+                            style={{
+                                borderColor: 'var(--border-primary)',
+                                backgroundColor: 'var(--bg-card)'
+                            }}
+                        >
+                            <Sparkles className="w-4 h-4" style={{ color: 'var(--text-accent)' }} />
+                            <span className="text-sm font-semibold" style={{ color: 'var(--text-accent)' }}>
+                                India's First Browser-Native DOOH Marketplace
+                            </span>
+                        </motion.div>
+
+                        <h1
+                            className="text-4xl md:text-5xl lg:text-7xl font-bold heading-font leading-tight transition-colors duration-300"
+                            style={{ color: 'var(--text-primary)' }}
+                        >
+                            Buy digital billboards like you{' '}
+                            <span style={{ color: 'var(--text-accent)' }}>book online ads</span>
+                        </h1>
+
+                        <p
+                            className="text-lg md:text-xl max-w-3xl mx-auto transition-colors duration-300"
+                            style={{ color: 'var(--text-secondary)' }}
+                        >
+                            No sales calls. No retainers. Just screens, budget, and results.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+                        <Link
+                            href="/browse-screens"
+                            className="px-8 py-4 rounded-lg font-semibold text-white transition-all duration-300 hover:shadow-lg flex items-center gap-2"
+                            style={{ backgroundColor: 'var(--accent-purple)' }}
+                        >
+                            Browse screens
+                            <ArrowRight className="w-5 h-5" />
+                        </Link>
+                        <Link
+                            href="/contact"
+                            className="px-8 py-4 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg"
+                            style={{
+                                border: '1px solid var(--border-primary)',
+                                color: 'var(--text-primary)',
+                                backgroundColor: 'var(--bg-card)'
+                            }}
+                        >
+                            Book demo
+                        </Link>
+                    </div>
                 </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
-      {/* Why Mark AI */}
-      <section className="bg-elev py-20 md:py-28">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Why Mark AI</div>
-            <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-base md:text-5xl">
-              Built for{" "}
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD }}>
-                modern marketing teams
-              </span>
-              .
-            </h2>
-          </div>
-
-          <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {benefits.map((b, i) => {
-              const Icon = b.icon;
-              return (
+                {/* The Problem Section */}
                 <motion.div
-                  key={b.title}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true, margin: "-80px" }}
-                  variants={fadeUp}
-                  transition={{ duration: 0.5, delay: i * 0.08 }}
-                  className="rounded-3xl border border-subtle bg-base p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6 }}
+                    className="space-y-12"
                 >
-                  <Icon className="h-7 w-7 text-base" strokeWidth={1.5} aria-hidden />
-                  <div aria-hidden className="mt-5 h-px w-10 bg-gray-200" />
-                  <h3 className="mt-4 text-lg font-bold text-base">{b.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">{b.desc}</p>
+                    <h2
+                        className="text-3xl md:text-4xl lg:text-5xl font-bold heading-font text-center transition-colors duration-300"
+                        style={{ color: 'var(--text-primary)' }}
+                    >
+                        DOOH bookings are{' '}
+                        <span style={{ color: 'var(--text-accent)' }}>stuck in 2010.</span>
+                    </h2>
+
+                    <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                        {/* Problem side */}
+                        <motion.div
+                            whileHover={{ y: -5 }}
+                            className="p-8 rounded-2xl space-y-4 transition-all duration-300"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                                border: '1px solid rgba(239, 68, 68, 0.2)'
+                            }}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <AlertCircle className="w-8 h-8 text-red-500" />
+                                <h3 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                                    The Old Way
+                                </h3>
+                            </div>
+                            <ul className="space-y-3">
+                                {[
+                                    "Cold calls to agencies",
+                                    "Endless negotiations",
+                                    "15-day contracts",
+                                    "No transparency on actual playtime",
+                                    "No proof of delivery",
+                                    "40% budget wasted on 'sold' screens that never play"
+                                ].map((item, i) => (
+                                    <li key={i} className="flex items-start gap-3" style={{ color: 'var(--text-secondary)' }}>
+                                        <Phone className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </motion.div>
+
+                        {/* Solution side */}
+                        <motion.div
+                            whileHover={{ y: -5 }}
+                            className="p-8 rounded-2xl space-y-4 transition-all duration-300"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                                border: '1px solid rgba(16, 185, 129, 0.2)'
+                            }}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <Sparkles className="w-8 h-8 text-green-500" />
+                                <h3 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                                    The MarkAI Way
+                                </h3>
+                            </div>
+                            <p className="text-lg font-semibold" style={{ color: 'var(--text-accent)' }}>
+                                Brands need a better way.
+                            </p>
+                            <p style={{ color: 'var(--text-secondary)' }}>
+                                We built India's first browser-native DOOH marketplace where you can book digital billboards
+                                as easily as running a Facebook ad—with full transparency, proof-of-play, and no minimum spend.
+                            </p>
+                        </motion.div>
+                    </div>
                 </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
-      {/* Comparison */}
-      <section className="bg-base py-20 md:py-28">
-        <div className="mx-auto max-w-5xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">The difference</div>
-            <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-base md:text-5xl">
-              Traditional DOOH vs{" "}
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD }}>
-                Mark AI
-              </span>
-              .
-            </h2>
-          </div>
+                {/* How MarkAI Works Section */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    className="space-y-12"
+                >
+                    <div className="text-center space-y-4">
+                        <h2
+                            className="text-3xl md:text-4xl lg:text-5xl font-bold heading-font transition-colors duration-300"
+                            style={{ color: 'var(--text-primary)' }}
+                        >
+                            4 clicks to{' '}
+                            <span style={{ color: 'var(--text-accent)' }}>live campaign</span>
+                        </h2>
+                    </div>
 
-          <div className="mt-12 overflow-hidden rounded-3xl border border-subtle bg-base shadow-sm">
-            <div className="grid grid-cols-3 border-b border-subtle bg-elev text-xs font-bold uppercase tracking-[0.15em] text-subtle">
-              <div className="px-6 py-4">Feature</div>
-              <div className="px-6 py-4">Traditional</div>
-              <div className="px-6 py-4 text-base">Mark AI</div>
+                    <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true }}
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                    >
+                        {steps.map((step, index) => {
+                            const IconComponent = step.icon;
+                            return (
+                                <motion.div
+                                    key={index}
+                                    variants={itemVariants}
+                                    whileHover={{ y: -8, scale: 1.03 }}
+                                    className="relative p-6 rounded-2xl transition-all duration-300"
+                                    style={{
+                                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                                        border: '1px solid var(--border-primary)'
+                                    }}
+                                >
+                                    <div className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl"
+                                        style={{
+                                            backgroundColor: 'var(--accent-purple)',
+                                            color: '#ffffff'
+                                        }}
+                                    >
+                                        {step.number}
+                                    </div>
+
+                                    <IconComponent className="w-12 h-12 mb-4" style={{ color: 'var(--text-accent)' }} />
+
+                                    <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+                                        {step.title}
+                                    </h3>
+                                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                        {step.description}
+                                    </p>
+                                </motion.div>
+                            );
+                        })}
+                    </motion.div>
+                </motion.div>
+
+                {/* Why Brands Choose MarkAI Section */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    className="space-y-12"
+                >
+                    <h2
+                        className="text-3xl md:text-4xl lg:text-5xl font-bold heading-font text-center transition-colors duration-300"
+                        style={{ color: 'var(--text-primary)' }}
+                    >
+                        Why brands choose{' '}
+                        <span style={{ color: 'var(--text-accent)' }}>MarkAI</span>
+                    </h2>
+
+                    <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true }}
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                    >
+                        {benefits.map((benefit, index) => {
+                            const IconComponent = benefit.icon;
+                            const gradients = [
+                                'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                                'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                                'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
+                                'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)'
+                            ];
+
+                            return (
+                                <motion.div
+                                    key={index}
+                                    variants={itemVariants}
+                                    whileHover={{ y: -8, scale: 1.02 }}
+                                    className="p-6 rounded-2xl transition-all duration-300"
+                                    style={{
+                                        background: gradients[index],
+                                        border: '1px solid var(--border-primary)',
+                                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)'
+                                    }}
+                                >
+                                    <IconComponent className="w-12 h-12 mb-4" style={{ color: 'var(--text-accent)' }} />
+
+                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
+                                        {benefit.title}
+                                    </h3>
+                                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                                        {benefit.description}
+                                    </p>
+                                </motion.div>
+                            );
+                        })}
+                    </motion.div>
+                </motion.div>
+
+                {/* Traction Section */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    className="space-y-12"
+                >
+                    <div className="text-center space-y-4">
+                        <h2
+                            className="text-3xl md:text-4xl lg:text-5xl font-bold heading-font transition-colors duration-300"
+                            style={{ color: 'var(--text-primary)' }}
+                        >
+                            <span style={{ color: 'var(--text-accent)' }}>30 screens</span> live in Bengaluru
+                        </h2>
+                    </div>
+
+                    <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true }}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+                    >
+                        {stats.map((stat, index) => {
+                            const IconComponent = stat.icon;
+                            return (
+                                <motion.div
+                                    key={index}
+                                    variants={itemVariants}
+                                    whileHover={{ scale: 1.05 }}
+                                    className="p-6 rounded-2xl text-center transition-all duration-300"
+                                    style={{
+                                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                                        border: '1px solid var(--border-primary)'
+                                    }}
+                                >
+                                    <IconComponent className="w-10 h-10 mx-auto mb-4" style={{ color: 'var(--text-accent)' }} />
+                                    <div className="text-3xl md:text-4xl font-bold mb-2" style={{ color: 'var(--text-accent)' }}>
+                                        {stat.value}
+                                    </div>
+                                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                        {stat.label}
+                                    </p>
+                                </motion.div>
+                            );
+                        })}
+                    </motion.div>
+
+                    <p className="text-center text-lg" style={{ color: 'var(--text-secondary)' }}>
+                        Expanding to <span style={{ color: 'var(--text-accent)' }}>Hyderabad, Chennai</span> Q2 2026
+                    </p>
+                </motion.div>
+
+                {/* Team Section */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    className="space-y-12"
+                >
+                    <div className="text-center space-y-4">
+                        <h2
+                            className="text-3xl md:text-4xl lg:text-5xl font-bold heading-font transition-colors duration-300"
+                            style={{ color: 'var(--text-primary)' }}
+                        >
+                            Built by{' '}
+                            <span style={{ color: 'var(--text-accent)' }}>adtech operators</span>
+                        </h2>
+                    </div>
+
+                    <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true }}
+                        className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-4xl mx-auto"
+                    >
+                        {founders.map((founder, index) => (
+                            <motion.div
+                                key={founder.name}
+                                variants={itemVariants}
+                                whileHover={{ y: -8 }}
+                                className="flex flex-col items-center text-center"
+                            >
+                                <motion.div
+                                    whileHover={{ scale: 1.05 }}
+                                    className="relative w-40 h-40 md:w-48 md:h-48 mb-6 rounded-full overflow-hidden shadow-xl"
+                                    style={{ boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)' }}
+                                >
+                                    <Image
+                                        src={founder.image}
+                                        alt={founder.name}
+                                        fill
+                                        className="object-cover"
+                                        priority={index === 0}
+                                    />
+                                </motion.div>
+
+                                <h3 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+                                    {founder.name}
+                                </h3>
+                                <p className="text-lg font-semibold mb-3" style={{ color: 'var(--text-accent)' }}>
+                                    {founder.role}
+                                </p>
+                                <p className="text-base max-w-sm" style={{ color: 'var(--text-secondary)' }}>
+                                    {founder.title}
+                                </p>
+                            </motion.div>
+                        ))}
+                    </motion.div>
+                </motion.div>
+
+                {/* Comparison Table Section */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    className="space-y-12"
+                >
+                    <h2
+                        className="text-3xl md:text-4xl lg:text-5xl font-bold heading-font text-center transition-colors duration-300"
+                        style={{ color: 'var(--text-primary)' }}
+                    >
+                        How we're{' '}
+                        <span style={{ color: 'var(--text-accent)' }}>different</span>
+                    </h2>
+
+                    <div className="max-w-4xl mx-auto overflow-x-auto">
+                        <div className="min-w-[600px]">
+                            {/* Table Header */}
+                            <div className="grid grid-cols-3 gap-4 mb-4">
+                                <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-card)' }}>
+                                    <h3 className="font-bold text-center" style={{ color: 'var(--text-primary)' }}>
+                                        Feature
+                                    </h3>
+                                </div>
+                                <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-card)' }}>
+                                    <h3 className="font-bold text-center" style={{ color: 'var(--text-secondary)' }}>
+                                        Traditional Agencies
+                                    </h3>
+                                </div>
+                                <div className="p-4 rounded-lg" style={{
+                                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                                    border: '2px solid var(--accent-purple)'
+                                }}>
+                                    <h3 className="font-bold text-center" style={{ color: 'var(--text-accent)' }}>
+                                        Mark AI 
+                                    </h3>
+                                </div>
+                            </div>
+
+                            {/* Table Rows */}
+                            {comparisonData.map((row, index) => (
+                                <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    whileInView={{ opacity: 1, x: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className="grid grid-cols-3 gap-4 mb-3"
+                                >
+                                    <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-card)' }}>
+                                        <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                            {row.feature}
+                                        </p>
+                                    </div>
+                                    <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-card)' }}>
+                                        <p style={{ color: 'var(--text-secondary)' }}>{row.traditional}</p>
+                                    </div>
+                                    <div className="p-4 rounded-lg" style={{
+                                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)'
+                                    }}>
+                                        <p className="font-semibold" style={{ color: 'var(--text-accent)' }}>
+                                            {row.markai}
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Final CTA Section */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="text-center space-y-8 py-16 px-6 rounded-3xl"
+                    style={{
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                        border: '1px solid var(--border-primary)'
+                    }}
+                >
+                    <h2
+                        className="text-3xl md:text-4xl lg:text-5xl font-bold heading-font transition-colors duration-300"
+                        style={{ color: 'var(--text-primary)' }}
+                    >
+                        Ready to try DOOH{' '}
+                        <span style={{ color: 'var(--text-accent)' }}>without the headache?</span>
+                    </h2>
+
+                    <p
+                        className="text-lg md:text-xl max-w-2xl mx-auto transition-colors duration-300"
+                        style={{ color: 'var(--text-secondary)' }}
+                    >
+                        India's first pay-per-play DOOH marketplace. Book your first screen today.
+                    </p>
+
+                    <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+                        <Link
+                            href="/dashboard"
+                            className="px-8 py-4 rounded-lg font-semibold text-white transition-all duration-300 hover:shadow-xl flex items-center gap-2"
+                            style={{ backgroundColor: 'var(--accent-purple)' }}
+                        >
+                            Browse 30+ screens
+                            <ArrowRight className="w-5 h-5" />
+                        </Link>
+                        <Link
+                            href="/contact"
+                            className="px-8 py-4 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg"
+                            style={{
+                                border: '1px solid var(--border-primary)',
+                                color: 'var(--text-primary)',
+                                backgroundColor: 'var(--bg-card)'
+                            }}
+                        >
+                            Book 15-min demo
+                        </Link>
+                    </div>
+                </motion.div>
             </div>
-            {comparisonData.map((row, i) => (
-              <div
-                key={row.feature}
-                className={`grid grid-cols-3 items-center border-b border-subtle last:border-b-0 ${i % 2 === 0 ? "bg-base" : "bg-elev"}`}
-              >
-                <div className="px-6 py-5 text-sm font-semibold text-base">{row.feature}</div>
-                <div className="flex items-center gap-2 px-6 py-5 text-sm text-muted">
-                  <X className="h-4 w-4 shrink-0 text-faint" />
-                  {row.traditional}
-                </div>
-                <div className="flex items-center gap-2 px-6 py-5 text-sm font-semibold text-base">
-                  <Check className="h-4 w-4 shrink-0" style={{ color: "var(--brand-blue)" }} strokeWidth={3} />
-                  {row.markai}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
-      </section>
-
-      {/* Founders */}
-      <section className="bg-elev py-20 md:py-28">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Founders</div>
-            <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-base md:text-5xl">
-              The team{" "}
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD }}>
-                building Mark AI
-              </span>
-              .
-            </h2>
-          </div>
-
-          <div className="mx-auto mt-14 grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-2">
-            {founders.map((f, i) => (
-              <motion.div
-                key={f.name}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-80px" }}
-                variants={fadeUp}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="overflow-hidden rounded-3xl border border-subtle bg-base shadow-sm transition hover:shadow-xl"
-              >
-                <div className="relative aspect-[4/3] w-full">
-                  <Image src={f.image} alt={f.name} fill className="object-cover" />
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-base">{f.name}</h3>
-                  <div className="mt-1 text-sm font-semibold bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRAD }}>
-                    {f.role}
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-muted">{f.title}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-    </div>
-  );
+    );
 };
 
 export default AboutSection;

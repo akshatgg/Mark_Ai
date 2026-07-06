@@ -387,24 +387,18 @@ const BookCampaignPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0e1a] text-base">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--brand-blue)" }} />
+      <div className="min-h-screen flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
       </div>
     );
   }
 
   if (!currentScreen || !currentScreenId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0e1a] text-base">
+      <div className="min-h-screen flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
         <div className="text-center">
-          <p className="text-xl mb-4 text-base">Screen not found</p>
-          <Link
-            href="/browse-screens"
-            className="font-semibold bg-clip-text text-transparent"
-            style={{
-              backgroundImage: "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-            }}
-          >
+          <p className="text-xl mb-4 transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Screen not found</p>
+          <Link href="/browse-screens" className="text-purple-400 hover:text-purple-300 transition-colors duration-300">
             Back to Browse Screens
           </Link>
         </div>
@@ -433,63 +427,46 @@ const BookCampaignPage = () => {
   }));
 
   return (
-    <div className="relative min-h-screen overflow-hidden py-20 bg-white dark:bg-[#0a0e1a] transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full blur-3xl opacity-30"
-        style={{ background: "radial-gradient(circle, var(--brand-blue) 0%, transparent 70%)" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute top-1/3 -right-32 h-[520px] w-[520px] rounded-full blur-3xl opacity-25"
-        style={{ background: "radial-gradient(circle, var(--brand-cyan) 0%, transparent 70%)" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 left-1/3 h-[320px] w-[320px] rounded-full blur-3xl opacity-20"
-        style={{ background: "radial-gradient(circle, var(--brand-lime) 0%, transparent 70%)" }}
-      />
+    <div className="relative min-h-screen py-20 transition-colors duration-300" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(123,67,255,0.15),transparent_50%)]" />
 
       <div className="relative z-10 w-[95%] md:w-[90%] mx-auto pt-8 pb-12">
+        {/* Header */}
         <div className="mb-8">
           <Link
             href={`/screens/${idParam}`}
-            className="inline-flex items-center gap-2 rounded-full border border-base bg-surface/70 px-4 py-1.5 text-sm font-medium text-subtle backdrop-blur transition hover:bg-elev mb-4"
+            className="inline-flex items-center gap-2 transition-colors duration-300 mb-4 hover:opacity-80"
+            style={{ color: 'var(--text-tertiary)' }}
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }} />
             Back to Screen Details
           </Link>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold heading-font tracking-tight text-base">
-                Book{" "}
-                <span
-                  className="bg-clip-text text-transparent"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-green) 100%)",
-                  }}
-                >
-                  Campaign
-                </span>
+              <h1 className="text-3xl md:text-4xl font-bold heading-font transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
+                Book Campaign
               </h1>
-              <p className="mt-2 text-muted">
+              <p className="mt-2 transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
                 {aggregateData.screensCount} screen{aggregateData.screensCount !== 1 ? 's' : ''} selected • {aggregateData.totalSlots} slot{aggregateData.totalSlots !== 1 ? 's' : ''}
               </p>
             </div>
 
+            {/* Add Screens Button */}
             <button
               onClick={() => setIsSelectorOpen(true)}
-              className="group inline-flex items-center gap-2 rounded-full px-5 md:px-6 py-2.5 md:py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
-              style={{
-                background: "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 100%)",
-                boxShadow: "0 12px 30px -10px rgba(47, 86, 224, 0.5)",
-              }}
+              className={cn(
+                "px-4 md:px-6 py-2.5 md:py-3 rounded-lg font-semibold text-sm",
+                "backdrop-blur-md border",
+                "hover:opacity-80",
+                "transition-all duration-300",
+                "flex items-center gap-2"
+              )}
+              style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 transition-colors duration-300" style={{ color: 'var(--text-primary)' }} />
               Add Screens
               {aggregateData.screensCount > 1 && (
-                <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-purple-500 text-xs">
                   {aggregateData.screensCount}
                 </span>
               )}
@@ -512,7 +489,7 @@ const BookCampaignPage = () => {
                     "px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap",
                     "border transition-all duration-300",
                     isActive
-                      ? "bg-[var(--brand-blue)] border-[var(--brand-blue)] text-white"
+                      ? "bg-purple-600 border-purple-500 text-white"
                       : "hover:opacity-80"
                   )}
                   style={isActive ? {} : { backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)' }}

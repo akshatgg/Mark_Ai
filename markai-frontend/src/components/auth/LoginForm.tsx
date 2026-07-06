@@ -122,17 +122,17 @@ const LoginForm = ({ onSuccess, showSignupLink = true, className }: LoginFormPro
 
   return (
     <div className={className}>
-      <div className="space-y-3 text-center">
-        <p className="text-xs uppercase tracking-[0.35em] font-semibold brand-gradient-text">Welcome Back</p>
+      <div className="space-y-4 text-center">
+        <p className="text-xs uppercase tracking-[0.35em] transition-colors duration-300" style={{ color: 'var(--accent-purple)', opacity: 0.8 }}>Welcome Back</p>
         <div>
           <h1 className="heading-font text-3xl font-semibold transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Login to Mark AI</h1>
-          <p className="mt-3 text-sm transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-2 text-sm transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
             Access your campaigns, dashboards, and collaboration tools.
           </p>
         </div>
       </div>
 
-      <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+      <form className="space-y-6" onSubmit={handleSubmit}>
         <div className="space-y-2">
           <Label className="text-sm font-medium transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>Work Email</Label>
           <Input
@@ -185,7 +185,13 @@ const LoginForm = ({ onSuccess, showSignupLink = true, className }: LoginFormPro
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="brand-gradient-bg w-full rounded-full py-3 font-semibold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg disabled:opacity-70"
+          className="w-full py-3 font-semibold transition-all duration-300 disabled:opacity-70"
+          style={{
+            backgroundColor: 'var(--accent-purple)',
+            color: '#ffffff'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
         >
           {isSubmitting ? "Signing in..." : "Sign In"}
         </Button>

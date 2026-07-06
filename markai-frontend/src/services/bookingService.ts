@@ -409,7 +409,7 @@ export const getBookingStatusInfo = (booking: Booking): { label: string; color: 
     case "live":
       return {
         label: "Live",
-        color: "bg-[var(--brand-blue)]/15 text-[var(--brand-blue)] border-[var(--brand-blue)]/30",
+        color: "bg-purple-500/20 text-purple-400 border-purple-500/30",
         description: "Currently displaying",
       };
     case "completed":

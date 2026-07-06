@@ -1,5 +1,5 @@
 // Your main backend URL
-export const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://mainbackend.mark-ai.tech";
+export const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.mark-ai.tech/api";
 
 // Xibo CMS URL for campaigns, displays, and analytics
 export const xiboUrl = process.env.NEXT_PUBLIC_XIBO_URL;

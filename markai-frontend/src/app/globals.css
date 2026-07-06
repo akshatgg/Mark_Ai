@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -32,30 +31,26 @@
   --color-ring: 59 130 246;
 }
 
-/* ==== Legacy theme variable aliases — every value MUST resolve back to a token in theme.css ==== */
-/* Do not add new colors here; declare them in theme.css instead. */
+/* ==== Theme Variables ==== */
 :root {
-  /* Legacy bg/text/border aliases pointing at theme.css tokens */
-  --bg-primary: var(--color-page-bg);
-  --bg-secondary: var(--color-page-bg-elevated);
-  --bg-tertiary: var(--color-surface-elev);
-  --bg-card: var(--color-surface);
-  --bg-accent: var(--color-info-soft);
+  /* Light theme colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-card: #ffffff;
+  --bg-accent: rgba(59, 130, 246, 0.05);
 
-  --text-primary: var(--color-text);
-  --text-secondary: var(--color-text-muted);
-  --text-tertiary: var(--color-text-subtle);
-  --text-inverse: var(--color-text-inverse);
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-inverse: #ffffff;
 
-  --border-primary: var(--color-border);
-  --border-secondary: var(--color-divider);
+  --border-primary: rgba(0, 0, 0, 0.1);
+  --border-secondary: rgba(0, 0, 0, 0.05);
 
-  --accent-blue: var(--brand-blue);
-  --accent-blue-hover: var(--brand-blue-dark);
-  --accent-purple: var(--brand-blue); /* Legacy purple alias kept on-brand */
-
-  --brand-purple: var(--brand-blue); /* Legacy purple alias kept on-brand */
-  --brand-glow: var(--brand-glow-blue-soft);
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #2563eb;
+  --accent-purple: #8b5cf6;
 
   --shadow-sm: rgba(0, 0, 0, 0.05);
   --shadow-md: rgba(0, 0, 0, 0.1);
@@ -71,13 +66,24 @@
 }
 
 .dark {
-  /* Dark mode legacy aliases — theme.css owns the underlying tokens */
-  --bg-accent: var(--color-info-soft);
-  --accent-blue: var(--brand-blue);
-  --accent-blue-hover: var(--brand-blue-dark);
-  --accent-purple: var(--brand-blue);
-  --brand-purple: var(--brand-blue);
-  --brand-glow: var(--brand-glow-blue);
+  /* Dark theme colors */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-accent: rgba(59, 130, 246, 0.1);
+
+  --text-primary: #ffffff;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #000000;
+
+  --border-primary: rgba(255, 255, 255, 0.1);
+  --border-secondary: rgba(255, 255, 255, 0.05);
+
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #60a5fa;
+  --accent-purple: #a78bfa;
 
   --shadow-sm: rgba(0, 0, 0, 0.3);
   --shadow-md: rgba(0, 0, 0, 0.5);
@@ -95,95 +101,22 @@
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  font-family: var(--font-montserrat), "Montserrat", sans-serif;
   overflow-x: hidden;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .heading-font {
-  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  font-family: var(--font-playfair-display), "Playfair Display", serif;
   font-optical-sizing: auto;
   font-style: normal;
-  letter-spacing: -0.02em;
 }
 
 .subheading-font {
-  font-family: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  font-family: var(--font-montserrat), "Montserrat", sans-serif;
   font-optical-sizing: auto;
   font-style: normal;
 }
-
-/* ==== Brand utilities (logo-derived) ==== */
-.brand-gradient-text {
-  background-image: var(--brand-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
-.brand-gradient-bg {
-  background-image: var(--brand-gradient);
-  color: var(--color-on-brand);
-}
-
-.brand-gradient-bg:hover {
-  background-image: var(--brand-gradient-strong);
-}
-
-.brand-gradient-bg-cool {
-  background-image: var(--brand-gradient-cool);
-  color: var(--color-on-brand);
-}
-
-.brand-gradient-text-cool {
-  background-image: var(--brand-gradient-cool);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
-.brand-ring {
-  box-shadow: 0 0 0 1px var(--brand-blue), 0 8px 24px -8px var(--brand-glow);
-}
-
-/* ==== Glass surface (navbar / floating panels) ==== */
-.glass-panel {
-  background-color: var(--glass-bg);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-}
-
-.glass-panel-strong {
-  background-color: var(--glass-bg-strong);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-}
-
-/* ==== Theme-aware surface & text utilities ==== */
-/* Use these everywhere instead of hard-coded white / gray-* so light/dark themes both look correct. */
-
-/* All colors below resolve to tokens declared in theme.css — do NOT hardcode hex here. */
-.bg-base { background-color: var(--color-page-bg); }
-.bg-elev { background-color: var(--color-surface-elev); }
-.bg-surface { background-color: var(--color-surface); }
-
-.text-base { color: var(--color-text); }
-.text-muted { color: var(--color-text-muted); }
-.text-subtle { color: var(--color-text-subtle); }
-.text-faint { color: var(--color-text-faint); }
-
-.border-base { border-color: var(--color-border); }
-.border-subtle { border-color: var(--color-divider); }
-.border-strong { border-color: var(--color-border-strong); }
-
-.ring-base { box-shadow: 0 0 0 1px var(--color-border); }
-.divider-base { border-color: var(--color-divider); }
 
 /* ==== Scrollbar Base ==== */
 ::-webkit-scrollbar {
@@ -237,26 +170,4 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-}
-
-/* Hide scrollbar utility — content remains scrollable, scrollbar UI is hidden. */
-.no-scrollbar {
-  scrollbar-width: none;          /* Firefox */
-  -ms-overflow-style: none;       /* IE / Edge legacy */
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;                  /* WebKit */
-  width: 0;
-  height: 0;
-}
-
-/* Table primitive uses overflow-x-auto on its inner container — strip its scrollbar by default. */
-[data-slot="table-container"] {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-[data-slot="table-container"]::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
 }

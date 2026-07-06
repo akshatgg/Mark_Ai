@@ -335,7 +335,7 @@ const ProofOfPlayPage = () => {
       <Card className="transition-colors duration-300" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-primary)' }}>
         <CardHeader className="p-4 pb-3 sm:p-5 sm:pb-3">
           <CardTitle className="flex items-center gap-2 text-base transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>
-            <Monitor className="w-4 h-4 text-[var(--brand-blue)]" />
+            <Monitor className="w-4 h-4 text-purple-400" />
             Configure Report
           </CardTitle>
           <CardDescription className="mt-1 text-xs transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
@@ -532,7 +532,7 @@ const ProofOfPlayPage = () => {
               <Button
                 onClick={handleFetchProofOfPlay}
                 disabled={!fromDate || !toDate || isFetching}
-                className="w-full h-9 text-sm bg-linear-to-r from-[var(--brand-blue)] to-blue-600 text-white hover:from-[var(--brand-blue-dark)] hover:to-blue-700 transition-colors duration-300"
+                className="w-full h-9 text-sm bg-linear-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 transition-colors duration-300"
               >
                 {isFetching ? (
                   <>

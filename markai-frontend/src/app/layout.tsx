@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Playfair_Display, Montserrat } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import ConditionalFooter from "@/components/layout/ConditionalFooter";
@@ -8,10 +8,16 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { HotToaster } from "@/components/ui/toaster";
 
-const plusJakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
+const playfairDisplay = Playfair_Display({
+  variable: "--font-playfair-display",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  variable: "--font-montserrat",
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -93,25 +99,10 @@ export default function RootLayout({
 }>) {
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '388332365810-i1j7ihkm46e67rqirhcrgojsalfi60tr.apps.googleusercontent.com';
-  const themeInitScript = `
-    (function() {
-      try {
-        var t = localStorage.getItem('theme');
-        if (!t) t = 'light';
-        var root = document.documentElement;
-        root.classList.remove('light', 'dark');
-        root.classList.add(t);
-        root.style.colorScheme = t;
-      } catch (e) {}
-    })();
-  `;
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
+    <html lang="en">
       <body
-        className={`${plusJakarta.variable} antialiased`}
+        className={`${playfairDisplay.variable} ${montserrat.variable} antialiased`}
       >
         <ThemeProvider>
           <GoogleOAuthProvider clientId={clientId}>

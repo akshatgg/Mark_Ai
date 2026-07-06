@@ -2,52 +2,53 @@
 
 import { Toaster } from "react-hot-toast"
 
-const baseStyle: React.CSSProperties = {
-  // All colors sourced from theme.css via CSS variables
-  background: "var(--toast-info-bg)",
-  color: "var(--color-text-inverse)",
-  borderRadius: "9999px",
-  padding: "12px 20px",
-  fontSize: "14px",
-  fontWeight: 500,
-  backdropFilter: "blur(12px) saturate(180%)",
-  WebkitBackdropFilter: "blur(12px) saturate(180%)",
-  border: "1px solid rgba(255, 255, 255, 0.15)",
-  boxShadow: "var(--toast-shadow)",
-}
-
 export function HotToaster() {
   return (
+
     <Toaster
       position="top-center"
       reverseOrder={false}
       toastOptions={{
         duration: 4000,
-        style: baseStyle,
+        style: {
+          background: "#111",
+          color: "#fff",
+          borderRadius: "16px",
+          padding: "15px",
+          fontSize: "16px",
+          backdropFilter: "blur(10px) saturate(180%)",
+          WebkitBackdropFilter: "blur(10px) saturate(180%)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
+        },
         success: {
           style: {
-            ...baseStyle,
-            background: "var(--toast-success-bg)",
-          },
-          iconTheme: {
-            primary: "#ffffff",
-            // Razorpay/react-hot-toast icon theme accepts only hex strings; mirrors --brand-blue
-            secondary: "#2f56e0",
+            background: "#111",
+            color: "#fff",
+            borderRadius: "16px",
+            padding: "15px",
+            fontSize: "16px",
+            backdropFilter: "blur(10px) saturate(180%)",
+            WebkitBackdropFilter: "blur(10px) saturate(180%)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
           },
         },
         error: {
           style: {
-            ...baseStyle,
-            background: "var(--toast-error-bg)",
-            boxShadow: "var(--toast-error-shadow)",
-          },
-          iconTheme: {
-            primary: "#ffffff",
-            // Mirrors --color-danger (#ef4444 in light theme)
-            secondary: "#ef4444",
+            background: "#111",
+            color: "#fff",
+            borderRadius: "16px",
+            padding: "15px",
+            fontSize: "16px",
+            backdropFilter: "blur(10px) saturate(180%)",
+            WebkitBackdropFilter: "blur(10px) saturate(180%)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
           },
         },
       }}
     />
   )
 }
+

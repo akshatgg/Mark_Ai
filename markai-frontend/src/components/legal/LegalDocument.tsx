@@ -1,195 +1,199 @@
 "use client";
-import React from "react";
-import Link from "next/link";
-import { ArrowLeft, Mail, Phone, Globe, MapPin } from "lucide-react";
-import { LegalDocument as LegalDocumentType, LegalSection } from "@/data/legal/types";
+import React from 'react';
+import { LegalDocument as LegalDocumentType, LegalSection } from '@/data/legal/types';
+import ThemeToggle from '@/components/theme/ThemeToggle';
 
 interface LegalDocumentProps {
   document: LegalDocumentType;
 }
 
-const BRAND_GRAD_FULL =
-  "linear-gradient(120deg, var(--brand-blue) 0%, var(--brand-cyan) 55%, var(--brand-green) 100%)";
-
-const renderContent = (content: string | string[]) => {
-  if (typeof content === "string") {
-    return <p className="mb-4 text-base leading-relaxed text-muted">{content}</p>;
-  }
-  return (
-    <ul className="mb-6 ml-4 list-disc space-y-3 text-muted">
-      {content.map((item, i) => (
-        <li key={i} className="pl-2 text-base leading-relaxed">
-          {item}
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const renderSection = (section: LegalSection, level = 0): React.ReactNode => {
-  const headingClass =
-    level === 0
-      ? "text-2xl md:text-3xl font-bold mt-12 mb-5 tracking-tight"
-      : level === 1
-      ? "text-xl md:text-2xl font-semibold mt-8 mb-4 tracking-tight"
-      : "text-lg font-semibold mt-6 mb-3 tracking-tight";
-
-  return (
-    <div key={section.id} className={level === 0 ? "mb-10" : "mb-6"}>
-      {section.title && (
-        <h2 className={`${headingClass} text-base`}>
-          <span
-            className="bg-clip-text text-transparent"
-            style={{ backgroundImage: BRAND_GRAD_FULL }}
-          >
-            {section.id}.
-          </span>{" "}
-          {section.title}
-        </h2>
-      )}
-      {section.content && renderContent(section.content)}
-      {section.subsections && (
-        <div className={level === 0 ? "ml-6" : "ml-4"}>
-          {section.subsections.map((s) => renderSection(s, level + 1))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 const LegalDocument: React.FC<LegalDocumentProps> = ({ document }) => {
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-base pt-28 pb-16 md:pt-32">
-      <div
-        aria-hidden
-        className="absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full opacity-25 blur-3xl"
-        style={{
-          background: "radial-gradient(circle, var(--brand-blue) 0%, transparent 70%)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute top-1/3 -right-32 h-[420px] w-[420px] rounded-full opacity-20 blur-3xl"
-        style={{
-          background: "radial-gradient(circle, var(--brand-cyan) 0%, transparent 70%)",
-        }}
-      />
+  const renderContent = (content: string | string[]) => {
+    if (typeof content === 'string') {
+      return (
+        <p className="leading-relaxed mb-4 text-base transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
+          {content}
+        </p>
+      );
+    }
+    return (
+      <ul className="list-disc list-inside space-y-3 mb-6 ml-4 transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
+        {content.map((item, index) => (
+          <li key={index} className="leading-relaxed text-base pl-2">{item}</li>
+        ))}
+      </ul>
+    );
+  };
 
-      <div className="relative z-10 mx-auto max-w-4xl px-6">
-        <Link
-          href="/"
-          className="mb-8 inline-flex items-center gap-2 text-sm text-subtle transition hover:text-base"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to home
-        </Link>
+  const renderSection = (section: LegalSection, level: number = 0) => {
+    const headingClass = level === 0
+      ? "heading-font text-3xl font-bold mt-12 mb-6 tracking-wide transition-colors duration-300"
+      : level === 1
+      ? "heading-font text-2xl font-semibold mt-8 mb-4 tracking-wide transition-colors duration-300"
+      : "heading-font text-xl font-medium mt-6 mb-3 tracking-wide transition-colors duration-300";
 
-        <div className="rounded-3xl border border-subtle bg-surface p-6 shadow-sm md:p-10">
-          <span className="inline-flex items-center gap-2 rounded-full border border-base bg-base px-3 py-1 text-xs font-medium text-muted">
-            Last updated · {document.lastUpdated}
-          </span>
-          <h1 className="mt-4 text-4xl font-bold leading-[1.1] tracking-tight text-base md:text-5xl">
-            {document.title}
-          </h1>
-
-          {document.introduction && (
-            <div
-              className="mt-8 rounded-2xl border-l-4 bg-elev p-6"
-              style={{ borderLeftColor: "var(--brand-blue)" }}
-            >
-              <h2 className="text-sm font-bold uppercase tracking-[0.15em] text-subtle">
-                Introduction
-              </h2>
-              <div className="mt-3 whitespace-pre-line text-base leading-relaxed text-muted">
-                {document.introduction}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-2">
-            {document.sections.map((s) => renderSection(s))}
+    return (
+      <div key={section.id} className={`mb-${level === 0 ? '10' : '6'}`}>
+        {section.title && (
+          <h2 className={headingClass} style={{ color: 'var(--text-primary)' }}>
+            <span style={{ color: 'var(--accent-blue)' }}>{section.id}.</span> {section.title}
+          </h2>
+        )}
+        {section.content && renderContent(section.content)}
+        {section.subsections && (
+          <div className={level === 0 ? "ml-6" : "ml-4"}>
+            {section.subsections.map((subsection) => renderSection(subsection, level + 1))}
           </div>
+        )}
+      </div>
+    );
+  };
 
-          {document.contactInfo && (
-            <div className="mt-12 rounded-2xl border border-subtle bg-elev p-6 md:p-8">
-              <h2 className="text-xl font-bold tracking-tight text-base">Contact us</h2>
-              <p className="mt-1 text-sm font-semibold text-muted">
-                {document.contactInfo.company}
-              </p>
-
-              <ul className="mt-5 space-y-3 text-sm">
-                <ContactRow
-                  icon={<Mail className="h-4 w-4" />}
-                  label="Email"
-                  value={document.contactInfo.email}
-                  href={`mailto:${document.contactInfo.email}`}
-                />
-                <ContactRow
-                  icon={<Phone className="h-4 w-4" />}
-                  label="Phone"
-                  value={document.contactInfo.phone}
-                />
-                <ContactRow
-                  icon={<MapPin className="h-4 w-4" />}
-                  label="Address"
-                  value={document.contactInfo.address}
-                />
-                <ContactRow
-                  icon={<Globe className="h-4 w-4" />}
-                  label="Website"
-                  value={document.contactInfo.website}
-                  href={`https://${document.contactInfo.website}`}
-                  external
-                />
-              </ul>
-            </div>
-          )}
+  return (
+    <div
+      className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 transition-colors duration-300"
+      style={{ backgroundColor: 'var(--bg-primary)' }}
+    >
+      {/* <ThemeToggle /> */}
+      <div className="max-w-5xl mx-auto">
+        {/* Header with Glassmorphism */}
+        <div
+          className="relative mb-12 overflow-hidden rounded-2xl transition-all duration-300"
+          style={{
+            background: 'linear-gradient(to right, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15))',
+            borderColor: 'var(--border-primary)'
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(to bottom right, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1))'
+            }}
+          />
+          <div className="relative z-10 px-8 py-10 md:px-12 md:py-12">
+            <h1
+              className="heading-font text-4xl md:text-5xl font-bold mb-3 tracking-wide transition-colors duration-300"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {document.title}
+            </h1>
+            <p
+              className="text-sm md:text-base font-medium transition-colors duration-300"
+              style={{ color: 'var(--accent-blue)' }}
+            >
+              Last Updated: {document.lastUpdated}
+            </p>
+          </div>
         </div>
 
-        <p className="mt-8 text-center text-sm text-subtle">
-          Thank you for using Mark AI. We&apos;re committed to a transparent, fair, and
-          secure advertising marketplace.
-        </p>
+        {/* Main Content Card */}
+        <div
+          className="relative backdrop-blur-xl border rounded-2xl overflow-hidden transition-all duration-300"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-primary)'
+          }}
+        >
+          <div className="px-8 py-10 md:px-12 md:py-12">
+            {document.introduction && (
+              <div
+                className="mb-12 p-8 relative backdrop-blur-lg border-l-4 rounded-r-xl transition-all duration-300"
+                style={{
+                  backgroundColor: 'var(--bg-accent)',
+                  borderLeftColor: 'var(--accent-blue)'
+                }}
+              >
+                <h2
+                  className="heading-font text-2xl font-bold mb-4 tracking-wide transition-colors duration-300"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  INTRODUCTION
+                </h2>
+                <div
+                  className="leading-relaxed whitespace-pre-line text-base transition-colors duration-300"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {document.introduction}
+                </div>
+              </div>
+            )}
+
+            <div className="prose prose-lg max-w-none">
+              {document.sections.map((section) => renderSection(section))}
+            </div>
+
+            {document.contactInfo && (
+              <div
+                className="mt-16 p-8 relative backdrop-blur-lg border-t-4 rounded-xl transition-all duration-300"
+                style={{
+                  background: 'linear-gradient(to bottom right, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08))',
+                  borderTopColor: 'var(--accent-blue)'
+                }}
+              >
+                <h2
+                  className="heading-font text-3xl font-bold mb-6 tracking-wide transition-colors duration-300"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  CONTACT US
+                </h2>
+                <div className="space-y-3" style={{ color: 'var(--text-secondary)' }}>
+                  <p
+                    className="heading-font text-xl font-semibold transition-colors duration-300"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {document.contactInfo.company}
+                  </p>
+                  <p className="flex items-center gap-2 text-base">
+                    <span style={{ color: 'var(--accent-blue)' }}>📧</span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Email:</span>
+                    <a
+                      href={`mailto:${document.contactInfo.email}`}
+                      className="transition-colors duration-200 underline underline-offset-4 hover:opacity-80"
+                      style={{ color: 'var(--accent-blue)' }}
+                    >
+                      {document.contactInfo.email}
+                    </a>
+                  </p>
+                  <p className="flex items-center gap-2 text-base">
+                    <span style={{ color: 'var(--accent-blue)' }}>📞</span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Phone:</span>
+                    <span>{document.contactInfo.phone}</span>
+                  </p>
+                  <p className="flex items-start gap-2 text-base">
+                    <span className="mt-1" style={{ color: 'var(--accent-blue)' }}>🏢</span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Address:</span>
+                    <span className="flex-1">{document.contactInfo.address}</span>
+                  </p>
+                  <p className="flex items-center gap-2 text-base">
+                    <span style={{ color: 'var(--accent-blue)' }}>🌐</span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Website:</span>
+                    <a
+                      href={`https://${document.contactInfo.website}`}
+                      className="transition-colors duration-200 underline underline-offset-4 hover:opacity-80"
+                      style={{ color: 'var(--accent-blue)' }}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {document.contactInfo.website}
+                    </a>
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer Note */}
+        <div className="max-w-5xl mx-auto mt-10 text-center">
+          <p
+            className="text-sm md:text-base transition-colors duration-300"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            Thank you for using MarkAI. We're committed to providing a transparent, fair, and secure advertising marketplace.
+          </p>
+        </div>
       </div>
     </div>
-  );
-};
-
-const ContactRow = ({
-  icon,
-  label,
-  value,
-  href,
-  external = false,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  href?: string;
-  external?: boolean;
-}) => {
-  const valueNode = href ? (
-    <a
-      href={href}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noopener noreferrer" : undefined}
-      className="font-medium text-base underline-offset-4 transition hover:underline"
-    >
-      {value}
-    </a>
-  ) : (
-    <span className="font-medium text-base">{value}</span>
-  );
-  return (
-    <li className="flex items-start gap-3">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-base bg-base text-base">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <div className="text-xs uppercase tracking-wider text-subtle">{label}</div>
-        <div className="mt-0.5">{valueNode}</div>
-      </div>
-    </li>
   );
 };
 

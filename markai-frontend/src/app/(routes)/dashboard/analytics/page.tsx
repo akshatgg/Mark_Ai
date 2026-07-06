@@ -124,7 +124,7 @@ const AnalyticsPage = () => {
                 <span className="text-sm transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>Mumbai</span>
                 <div className="flex items-center gap-2">
                   <div className="w-32 h-2 rounded-full overflow-hidden transition-colors duration-300" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-                    <div className="h-full bg-[var(--brand-blue)] rounded-full" style={{ width: "75%" }}></div>
+                    <div className="h-full bg-purple-500 rounded-full" style={{ width: "75%" }}></div>
                   </div>
                   <span className="text-sm font-medium transition-colors duration-300" style={{ color: 'var(--text-primary)' }}>45%</span>
                 </div>

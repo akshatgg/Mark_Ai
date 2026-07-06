@@ -94,7 +94,7 @@ const ScreenCards = () => {
                         onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
                     >
                         View all screens
-                        <span className="text-[var(--brand-blue)]">→</span>
+                        <span className="text-purple-400">→</span>
                     </Link>
                 </motion.div>
             </motion.div>
@@ -234,11 +234,21 @@ const ScreenCards = () => {
                                             href={`/screens/${screen._id}`}
                                             onClick={(e) => e.stopPropagation()}
                                             className={cn(
-                                                "brand-gradient-bg w-full md:w-auto px-5 md:px-6 py-2.5 md:py-3 rounded-full font-semibold text-xs md:text-sm",
+                                                "w-full md:w-auto px-5 md:px-6 py-2.5 md:py-3 rounded-lg font-semibold text-xs md:text-sm",
                                                 "transition-all duration-200",
-                                                "shadow-lg hover:shadow-xl hover:scale-105",
+                                                "shadow-lg hover:shadow-xl",
                                                 "flex items-center justify-center gap-2"
                                             )}
+                                            style={{
+                                                backgroundColor: 'var(--text-primary)',
+                                                color: 'var(--text-inverse)'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.opacity = '0.95';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.opacity = '1';
+                                            }}
                                         >
                                             <Eye className="w-3 h-3 md:w-4 md:h-4" />
                                             View
