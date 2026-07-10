@@ -93,8 +93,18 @@ The CMS uses `/api/cms/*` (JWT login). External partners use `/api/ext/*` (API-k
   (migration `0008`). Needs `ACCESS_FINE_LOCATION` (foreground only) granted once at
   install/first-launch (or auto-granted via MDM). The manual `location` field remains as a
   fallback/override. (Earlier this was a manual-only field; a pairing-code flow was declined.)
-- **Bookings are fully custom:** continuous (N days), hourly, specific time, N-times-per-day,
-  or custom. Bookings are advertiser campaigns placed by superadmins.
+- **Bookings are fully custom:** the schedule types in code are exactly
+  `continuous`, `specific_time`, `times_per_day`, and `custom` (there is **no**
+  "hourly" mode). Bookings are advertiser campaigns placed by superadmins.
+- **Per-screen operating hours (screen ON window):** every screen has a declared
+  daily window (`on_start_minute`/`on_end_minute`, IST minute-of-day; both null =
+  24/7), default **09:00–17:00**, set on registration and editable by the superadmin
+  (any screen) or the owning screenowner — one at a time or in bulk. Inside the
+  window ads play; outside it the screen shows black (the APK gates playback and
+  slows its heartbeat to a 15-min edge buffer). Advertisers can only book inside a
+  screen's hours (rejected 422 otherwise; a windowless booking inherits the screen's
+  hours). A silent screen outside hours reads `off_hours` (calm), not `offline`. We
+  do NOT power the panel off — the venue/hardware does that.
 - **The loop timing is OWNER-fixed, not client-set (important):** each screen has two
   owner/superadmin fields — `slot_duration_seconds` (how long EVERY ad plays) and
   `loop_duration_seconds` (when the loop restarts). Number of slots = loop ÷ slot. A client
