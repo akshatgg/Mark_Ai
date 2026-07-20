@@ -61,7 +61,8 @@ The new signage system is `markai-signage-api` + `markai-player-apk` + `markai-W
    ```bash
    cd markai-Web-cms && npm install && npm run dev                   # :5120
    ```
-   Log in at http://localhost:5120/login with **`superadmin` / `Admin@123`** (seeded).
+   Log in at http://localhost:5120/login with **`admin@mark-ai.tech` / `Admin@123`** (seeded).
+   CMS operators are identified by **email**, not a username (migration `0032`).
 3. **APK**: open `markai-player-apk` in Android Studio → run on an emulator/device.
    `BASE_URL` defaults to `http://10.0.2.2:8095` (emulator → host).
 
@@ -101,10 +102,13 @@ The CMS uses `/api/cms/*` (JWT login). External partners use `/api/ext/*` (API-k
   24/7), default **09:00–17:00**, set on registration and editable by the superadmin
   (any screen) or the owning screenowner — one at a time or in bulk. Inside the
   window ads play; outside it the screen shows black (the APK gates playback and
-  slows its heartbeat to a 15-min edge buffer). Advertisers can only book inside a
-  screen's hours (rejected 422 otherwise; a windowless booking inherits the screen's
-  hours). A silent screen outside hours reads `off_hours` (calm), not `offline`. We
-  do NOT power the panel off — the venue/hardware does that.
+  slows its heartbeat to a keep-alive — every 15 min in production, 1 min in dev —
+  rather than going silent, so a change to a closed screen's hours can still reach it
+  on its next check-in; the CMS tells the operator when a closed screen will apply the
+  change). Advertisers can only book inside a screen's hours (rejected 422 otherwise; a
+  windowless booking inherits the screen's hours). A quiet screen outside hours reads
+  `off_hours` (calm), not `offline`. We do NOT power the panel off — the venue/hardware
+  does that.
 - **The loop timing is OWNER-fixed, not client-set (important):** each screen has two
   owner/superadmin fields — `slot_duration_seconds` (how long EVERY ad plays) and
   `loop_duration_seconds` (when the loop restarts). Number of slots = loop ÷ slot. A client
