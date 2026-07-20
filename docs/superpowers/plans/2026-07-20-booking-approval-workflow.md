@@ -360,7 +360,7 @@ async def test_verify_returns_role_and_owned_screens(client, seeded):
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["id"] == owner["id"]
-    assert body["email"] == "bs"
+    assert body["email"] == "bs@cafe.com"
     assert body["role"] == "screenowner"
     assert body["screen_ids"] == [screen_id]
     assert body["is_active"] is True
@@ -1082,7 +1082,7 @@ def test_operator_token_carries_role_and_namespaced_subject():
     payload = decode_access_token(token)
 
     assert payload["sub"] == "cms:cms-user-1"
-    assert payload["email"] == "bs"
+    assert payload["email"] == "bs@cafe.com"
     assert payload["role"] == "screenowner"
 
 
@@ -2114,7 +2114,7 @@ async def test_approve_creates_the_cms_booking_once(client, monkeypatch):
     body = resp.json()
     assert body["approval_status"] == "approved"
     assert body["cms_booking_id"] == "cms-77"
-    assert body["decided_by_email"] == "bs"
+    assert body["decided_by_email"] == "bs@cafe.com"
     assert len(created) == 1
     assert created[0]["external_ref"]["order_id"] == booking_id
 
