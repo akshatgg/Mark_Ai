@@ -20,7 +20,7 @@
 - **Never run `black` in either Python repo.** Neither `main` is black-clean; a repo-wide format would bury this change in an unrelated diff. Match surrounding hand-formatting.
 - `markai-signage-api` lint gate: `poetry run ruff check app/api_keys app/cms_users` must stay clean (it passes on `main` today). Ruff has 3 pre-existing failures elsewhere in `app/` — ignore them.
 - `markai-backend-new` test gate: `poetry run pytest -q` (15 tests pass on `main` today).
-- `markai-frontend-new` has **no test framework**. Gates are `npx tsc --noEmit`, `npm run lint`, `npm run build`. Do not add vitest.
+- `markai-frontend-new` has **no test framework**, and no ESLint config either — `npm run lint` runs `next lint`, which prompts interactively to scaffold one and therefore cannot be used as a gate. Gates are `npx tsc --noEmit` and `npm run build`. Do not add vitest, and do not scaffold ESLint.
 - Both Python repos use `asyncio_mode = "auto"` — async test functions need no `@pytest.mark.asyncio` decorator.
 - `markai-backend-new` has **no `tests/conftest.py`**; the `client` fixture is defined inline at the top of `tests/test_auth.py`. New test modules define their own copy.
 - Roles are exactly `advertiser` (platform-native), `screenowner`, `superadmin`. Approval statuses are exactly `pending`, `approved`, `rejected`.
@@ -2746,7 +2746,7 @@ git commit -m "feat(approvals): operator console API for deciding booking reques
 # Phase C — `markai-frontend-new`
 
 No test framework here. After every task run all three gates:
-`npx tsc --noEmit && npm run lint && npm run build`.
+`npx tsc --noEmit && npm run build`.
 
 ### Task 8: Session layer — one shape, two principal kinds
 
@@ -2965,7 +2965,7 @@ Replace the body of the `"email"` step (lines 121-146) with:
 
 - [ ] **Step 3: Verify**
 
-Run: `cd markai-frontend-new && npx tsc --noEmit && npm run lint`
+Run: `cd markai-frontend-new && npx tsc --noEmit`
 Expected: the AuthCard reports no errors; Navbar and dashboard errors from Task 8 remain until Task 12.
 
 - [ ] **Step 4: Commit**
@@ -3454,7 +3454,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
 
 - [ ] **Step 5: Verify the gates**
 
-Run: `cd markai-frontend-new && npx tsc --noEmit && npm run lint`
+Run: `cd markai-frontend-new && npx tsc --noEmit`
 Expected: no errors from the new files (Navbar/dashboard errors from Task 8 remain until Task 12).
 
 - [ ] **Step 6: Commit**
@@ -3991,7 +3991,7 @@ export default function ApprovalHistoryPage() {
 
 - [ ] **Step 5: Verify**
 
-Run: `cd markai-frontend-new && npx tsc --noEmit && npm run lint`
+Run: `cd markai-frontend-new && npx tsc --noEmit`
 Expected: no errors from these files.
 
 - [ ] **Step 6: Commit**
@@ -4306,7 +4306,7 @@ In `markai-frontend-new/app/dashboard/page.tsx`, `app/dashboard/campaigns/page.t
 
 - [ ] **Step 8: Verify all three gates**
 
-Run: `cd markai-frontend-new && npx tsc --noEmit && npm run lint && npm run build`
+Run: `cd markai-frontend-new && npx tsc --noEmit && npm run build`
 Expected: all clean — zero type errors, zero lint errors, build succeeds.
 
 - [ ] **Step 9: Commit**
@@ -4373,7 +4373,7 @@ Then sign up an **advertiser** account using the same address `bs@cafe.com` with
 ```bash
 cd markai-signage-api  && poetry run pytest -q && poetry run ruff check app/api_keys app/cms_users
 cd ../markai-backend-new && poetry run pytest -q
-cd ../markai-frontend-new && npx tsc --noEmit && npm run lint && npm run build
+cd ../markai-frontend-new && npx tsc --noEmit && npm run build
 ```
 
 Expected: all green. Do not proceed past a failure — report it instead.
