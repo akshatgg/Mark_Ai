@@ -3395,14 +3395,22 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
     else if (!operator) router.replace("/dashboard");
   }, [loading, user, operator, router]);
 
-  useEffect(() => {
-    if (!hostRef.current) return;
-    const scene = new ConsoleScene(hostRef.current);
-    sceneRef.current = scene;
-    return () => {
-      scene.dispose();
+  // A ref CALLBACK, not an effect with [] deps. The host div only exists in
+  // the resolved branch below, and on the login -> /console path the first
+  // commit is always the loading branch (storeSession clears the session
+  // cache), so a once-only effect would find hostRef.current null, bail, and
+  // never retry — the backdrop would silently never mount.
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+
+  const attachScene = useCallback((node: HTMLDivElement | null) => {
+    if (node && !sceneRef.current) {
+      sceneRef.current = new ConsoleScene(node);
+      sceneRef.current.setTheme(themeRef.current);
+    } else if (!node && sceneRef.current) {
+      sceneRef.current.dispose();
       sceneRef.current = null;
-    };
+    }
   }, []);
 
   useEffect(() => {
@@ -3426,26 +3434,31 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("markai:approvals-changed", onChanged);
   }, [refreshCount]);
 
-  if (loading || !user || !operator) {
-    return (
-      <main className="relative min-h-screen bg-surface">
-        <div className="mx-auto max-w-[1180px] px-5 pt-24 sm:px-7">
-          <div className="h-10 w-56 animate-pulse rounded-xl bg-panel" />
-        </div>
-      </main>
-    );
-  }
+  const ready = !loading && !!user && operator;
 
   return (
     <div className="relative min-h-screen bg-surface">
-      <div ref={hostRef} aria-hidden className="fixed inset-0 z-0" />
+      {/* Mounted for operators only — an advertiser being redirected away
+          should not pay for a WebGL context, and the ref callback disposes
+          the scene the moment this node detaches. */}
+      {ready && <div ref={attachScene} aria-hidden className="fixed inset-0 z-0" />}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(ellipse_at_center,transparent_35%,color-mix(in_srgb,var(--bg)_78%,transparent)_100%)]"
       />
       <div className="relative z-[2]">
-        <ConsoleNav user={user} pending={pending} />
-        <main className="mx-auto max-w-[1180px] px-5 pb-24 pt-9 sm:px-7">{children}</main>
+        {ready ? (
+          <>
+            <ConsoleNav user={user} pending={pending} />
+            <main className="mx-auto max-w-[1180px] px-5 pb-24 pt-9 sm:px-7">
+              {children}
+            </main>
+          </>
+        ) : (
+          <div className="mx-auto max-w-[1180px] px-5 pt-24 sm:px-7">
+            <div className="h-10 w-56 animate-pulse rounded-xl bg-panel" />
+          </div>
+        )}
       </div>
     </div>
   );
