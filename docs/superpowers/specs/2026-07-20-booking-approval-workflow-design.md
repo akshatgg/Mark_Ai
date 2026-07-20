@@ -1,7 +1,7 @@
 # Booking approval workflow — screenowner / superadmin gate (design)
 
 Date: 2026-07-20 · Repos touched: `markai-signage-api`, `markai-backend-new`,
-`markai-frontend-new`. **`markai-Web-cms` is untouched.**
+`markai-frontend-new`, `markai-Web-cms`.
 Branch everywhere: `feature/booking-approval`, cut from `main`.
 
 ## What we're building
@@ -61,6 +61,33 @@ rejected request leaves no CMS row, no media reference and no audit noise.
    no booking wizard, no content library. They are supply side, not advertisers.
 8. **Build for newly created users only.** Production data is wiped before launch,
    so no backfill, no data migration of existing sample rows.
+9. **CMS operators are identified by email, not username** — one credential that
+   works in both the CMS and the platform (section 0). The seeded superadmin login
+   changes accordingly.
+10. **A checkbox, not the identifier's shape, chooses the auth system** — because
+    once operators have emails, one address can exist in both systems.
+
+## 0) CMS operators are identified by email
+
+Today a `CmsUser` has a `username` and no email at all
+(`markai-signage-api/app/cms_users/models.py:37`). Operators need to sign into the
+Mark AI platform with the same credential the superadmin issued them, and an email
+is the identifier that platform already speaks. So **`username` becomes `email`**
+across the CMS: one credential, one identifier, everywhere.
+
+- `cms_users.username` → `cms_users.email`, `String(320)`, unique, indexed
+  (migration `0032`, a straight rename — production is wiped before launch, so no
+  backfill or dual-read period is needed).
+- `POST /api/cms/auth/login` takes `{email, password}`.
+- The seeded superadmin becomes `admin@mark-ai.tech` / `Admin@123`
+  (`SEED_SUPERADMIN_EMAIL` / `SEED_SUPERADMIN_PASSWORD`). **This changes the
+  credential used to sign into the CMS today** — a deliberate, accepted cost.
+- `markai-Web-cms` asks for an email when creating a screenowner or superadmin,
+  and on its own login page. The enrollment key, screen assignment and role
+  controls are unchanged.
+
+This also retires the `f"{username}@gmail.com"` placeholder in
+`app/gmail/service.py:66` — there is a real address now.
 
 ## 1) Identity: how a CMS credential logs into the platform
 
@@ -69,23 +96,36 @@ The two systems hash differently and always will — CMS is **PBKDF2-HMAC-SHA256
 (`markai-backend-new/app/core/security.py:22`). Hashes can never be copied
 between them, so a live verification call is the only correct bridge.
 
-Routing rule (user's design), applied on the identifier:
+**The person tells us which system to ask, with a checkbox.** Once CMS operators
+have emails, the same address can legitimately exist in both systems — a café owner
+who also buys ads is one person with two roles — so nothing about the identifier's
+*shape* can disambiguate them. An explicit declaration can:
 
 ```
-POST /api/auth/identify { identifier }
+/auth   ☐ I'm a screen owner or administrator
         │
-   contains "@" ?
+   ticked ──► POST /api/auth/login {email, password, as_operator: true}
+        │        └──► CMS, live over /api/ext/auth/verify   → screenowner | superadmin
         │
-   yes  ├──► platform `users` table (bcrypt)   → advertiser. Existing flow, untouched.
-        │
-   no   └──► CMS, live                          → screenowner / superadmin
+ unticked ──► POST /api/auth/login {email, password}
+                 └──► platform `users` table (bcrypt)        → advertiser
 ```
 
-Advertisers therefore never incur a CMS round-trip on login.
+The checkbox reads **"I'm a screen owner or administrator"**, not "superadmin":
+a screenowner who reads the latter leaves it unticked and is told no account
+exists, which is the likeliest support call this feature could generate. Which of
+the two CMS roles they actually hold comes back from the CMS — they never declare it.
 
-For a bare username, `identify` returns `{kind: "operator"}` **without** probing the
-CMS — existence is only revealed by a successful login. This avoids username
-enumeration and keeps `identify` free of a password it doesn't have.
+Consequences that fall out of this and are deliberate:
+
+- Advertisers never incur a CMS round-trip on sign-in.
+- The email-first `identify` step runs **only** for advertisers. With the box
+  ticked the page asks for email and password together and goes straight to
+  `login`, because `identify` cannot answer for an operator without a password and
+  probing the CMS would leak which operator accounts exist.
+- One email may hold both an advertiser account and a CMS account, with different
+  passwords. The checkbox decides which one is being used. This is a feature, not
+  a collision.
 
 ### New CMS endpoint — `POST /api/ext/auth/verify`
 
@@ -93,8 +133,8 @@ In `markai-signage-api/app/api_keys/ext_router.py`, API-key authed via the exist
 `require_api_key` dependency.
 
 ```
-→ { username, password }
-← { id, username, role, screen_ids: [...], is_active }
+→ { email, password }
+← { id, email, role, screen_ids: [...], is_active }
   401 on bad credentials or inactive user
 ```
 
@@ -111,7 +151,7 @@ enrollment (`app/screens/enrollment_ratelimit.py`): 10 failures per 60s per IP.
 ### New CMS endpoint — `GET /api/ext/operators/{cms_user_id}/scope`
 
 ```
-← { role, screen_ids: [...], is_active }
+← { id, email, role, screen_ids: [...], is_active }
   404 if unknown, 200 with is_active=false if deactivated
 ```
 
@@ -127,8 +167,8 @@ Approvals are a low-traffic console, so the extra call is not a concern.
 
 ### Platform JWT
 
-`create_access_token` gains `role` and, for operators, `username`. Two principal
-shapes share one token format:
+`create_access_token` gains `role`, and operator tokens carry the CMS `email`.
+Two principal shapes share one token format:
 
 | principal | `sub` | `role` |
 |---|---|---|
@@ -147,7 +187,7 @@ A new `require_operator` dependency guards the approvals routes.
 On `bookings`:
 - `cms_booking_id` → **nullable** (it is populated only on approval)
 - `approval_status` str(16) not null default `pending` — `pending` \| `approved` \| `rejected`
-- `decided_by_cms_user_id` str(36) null, `decided_by_username` str(255) null,
+- `decided_by_cms_user_id` str(36) null, `decided_by_email` str(320) null,
   `decided_by_role` str(32) null, `decided_at` timestamptz null
 - `reject_reason` text null
 - index on `(approval_status, screen_id)` — the query behind both queues
@@ -204,11 +244,14 @@ transaction that flips the status, so a booking can never be created twice.
 
 ### Auth and shell
 
-- **`lib/auth.ts`** — `identify`/`login` take `identifier` rather than `email`;
-  session stores `role`. `useAuth()` exposes it.
-- **`components/auth/AuthCard.tsx`** — first field becomes "Email or username".
-  A bare username skips the Google branches entirely and goes straight to the
-  password step. Post-login routing: operator → `/console`, advertiser → `/` (unchanged).
+- **`lib/auth.ts`** — `login(email, password, asOperator)`; session stores `role`.
+  `useAuth()` exposes it.
+- **`components/auth/AuthCard.tsx`** — a checkbox, **"I'm a screen owner or
+  administrator"**, sits under the email field on the first step. Ticked, the card
+  shows email + password together and calls `login` directly, skipping `identify`
+  and hiding the Google button (a CMS credential has nothing to do with Google).
+  Unticked, the existing email-first advertiser flow is untouched. Post-login
+  routing: operator → `/console`, advertiser → `/` (unchanged).
 - **`app/console/layout.tsx`** — the operator shell, which does not exist today
   (there is no `app/dashboard/layout.tsx` either; the four advertiser pages each
   re-import Navbar/Backdrop/Footer). Operators get their own route namespace rather
@@ -283,10 +326,17 @@ shown live beneath it, not a grey line of text.
 
 ## Testing
 
-**`markai-signage-api`** (pytest): `/api/ext/auth/verify` — valid credentials return
-role and `screen_ids`; wrong password 401; inactive user 401; missing API key 401;
-superadmin returns empty `screen_ids`; rate limiter trips after 10 failures.
-`/api/ext/operators/{id}/scope` — reflects assignment changes and deactivation.
+**`markai-signage-api`** (pytest): email login works end to end (create an operator
+with an email, sign into `/api/cms/auth/login` with it); `/api/ext/auth/verify` —
+valid credentials return role and `screen_ids`; wrong password 401; inactive user
+401; missing API key 401; superadmin returns empty `screen_ids`; rate limiter trips
+after 10 failures. `/api/ext/operators/{id}/scope` — reflects assignment changes and
+deactivation. The existing suite must keep passing with `username` gone.
+
+**`markai-Web-cms`**: its vitest suite covers pure logic in `src/lib/` only — there
+is no component-testing setup, and adding one is out of scope. The gate is the
+existing `npm test` plus `npm run build`; the changed login and user-create forms
+are verified in the manual walkthrough below.
 
 **`markai-backend-new`** (pytest, mocked `cms_client`): booking create leaves
 `pending` and **never calls the CMS**; out-of-hours create 422s at request time;
@@ -295,11 +345,13 @@ owner approve calls the CMS once and stores `cms_booking_id`; non-owner screenow
 superadmin queue; double approve 409; reject never calls the CMS; CMS failure on
 approve leaves the row pending; operator JWT rejected by `/api/bookings`.
 
-**Manual end-to-end** against the local stack (8095 + 8096 + 3100): create
-screenowner BS in the CMS with screens assigned → advertiser books screen B →
-confirm no CMS booking exists → log into the platform as `bs` → approve → confirm
-the CMS booking appears and the screen reloads within one heartbeat. Repeat with
-reject and confirm the CMS stays clean.
+**Manual end-to-end** against the local stack (8095 + 8096 + 5120 + 3100): sign into
+the CMS as `admin@mark-ai.tech` → create screenowner `bs@cafe.com` with screens
+assigned → advertiser books that screen → confirm no CMS booking exists → sign into
+the platform with the checkbox ticked as `bs@cafe.com` → approve → confirm the CMS
+booking appears and the screen reloads within one heartbeat. Repeat with reject and
+confirm the CMS stays clean. Also confirm one email can hold both an advertiser and
+an operator account, and that the checkbox picks the right one.
 
 ## Out of scope
 
