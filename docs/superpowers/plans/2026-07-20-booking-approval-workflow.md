@@ -740,6 +740,8 @@ The CMS is never called until someone approves. These tests stub the CMS
 client entirely — the contract under test is ours, not the CMS's.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -771,6 +773,14 @@ async def client():
     await engine.dispose()
 
 
+# Real datetimes, not ISO strings: SQLAlchemy's SQLite dialect rejects a str
+# bound to a DateTime column, so string literals here would fail against a
+# perfectly correct implementation.
+IST = timezone(timedelta(hours=5, minutes=30))
+START_AT = datetime(2026, 8, 1, 9, 0, tzinfo=IST)
+END_AT = datetime(2026, 8, 8, 17, 0, tzinfo=IST)
+
+
 async def test_booking_row_defaults_to_pending_with_no_cms_twin(client):
     """A booking row can exist with no CMS twin — that is the pending state."""
     async with client.session_factory() as session:
@@ -788,8 +798,8 @@ async def test_booking_row_defaults_to_pending_with_no_cms_twin(client):
             screen_id="screen-b",
             name="Nike",
             schedule_type="continuous",
-            start_at="2026-08-01T09:00:00+05:30",
-            end_at="2026-08-08T17:00:00+05:30",
+            start_at=START_AT,
+            end_at=END_AT,
         )
         session.add(booking)
         await session.commit()
@@ -810,11 +820,11 @@ async def test_to_out_reports_pending_and_rejected_status(client):
         screen_id="screen-b",
         name="Nike",
         schedule_type="continuous",
-        start_at="2026-08-01T09:00:00+05:30",
-        end_at="2026-08-08T17:00:00+05:30",
+        start_at=START_AT,
+        end_at=END_AT,
         approval_status="pending",
         status_cache="pending",
-        created_at="2026-07-20T10:00:00+05:30",
+        created_at=datetime.now(timezone.utc),
     )
     assert to_out(booking).status == "pending_approval"
 
@@ -867,7 +877,7 @@ Insert after the `status_cache` column (after line 57):
     decided_by_cms_user_id: Mapped[str | None] = mapped_column(
         String(36), nullable=True
     )
-    decided_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    decided_by_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     decided_by_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -982,7 +992,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "bookings",
-        sa.Column("decided_by_email", sa.String(length=255), nullable=True),
+        sa.Column("decided_by_email", sa.String(length=320), nullable=True),
     )
     op.add_column(
         "bookings", sa.Column("decided_by_role", sa.String(length=32), nullable=True)
