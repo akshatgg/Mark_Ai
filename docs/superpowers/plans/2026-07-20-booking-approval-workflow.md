@@ -460,7 +460,7 @@ import time
 from collections import defaultdict
 from threading import Lock
 
-# At most _MAX_FAILURES bad passwords per _WINDOW_SECONDS per IP.
+# At most _MAX_FAILURES bad passwords per _WINDOW_SECONDS per ACCOUNT.
 _WINDOW_SECONDS = 300.0
 _MAX_FAILURES = 10
 
@@ -472,22 +472,22 @@ def _prune(now: float, times: list[float]) -> list[float]:
     return [t for t in times if now - t < _WINDOW_SECONDS]
 
 
-def is_blocked(client_ip: str) -> bool:
-    """True when this IP has already used up its failed-attempt budget."""
+def is_blocked(key: str) -> bool:
+    """True when this account has already used up its failed-attempt budget."""
     now = time.time()
     with _lock:
-        times = _prune(now, _failures.get(client_ip, []))
-        _failures[client_ip] = times
+        times = _prune(now, _failures.get(key, []))
+        _failures[key] = times
         return len(times) >= _MAX_FAILURES
 
 
-def record_failure(client_ip: str) -> None:
-    """Register one failed verification for this IP."""
+def record_failure(key: str) -> None:
+    """Register one failed verification for this account."""
     now = time.time()
     with _lock:
-        times = _prune(now, _failures.get(client_ip, []))
+        times = _prune(now, _failures.get(key, []))
         times.append(now)
-        _failures[client_ip] = times
+        _failures[key] = times
 
 
 def reset() -> None:
@@ -497,12 +497,6 @@ def reset() -> None:
 ```
 
 - [ ] **Step 4: Add the endpoint**
-
-In `markai-signage-api/app/api_keys/ext_router.py`, change the FastAPI import line (currently line 14) to add `Request`:
-
-```python
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-```
 
 Add these imports alongside the existing `from app.bookings import service as booking_service` block:
 
@@ -555,7 +549,6 @@ async def _to_ext_operator(db: AsyncSession, user: CmsUser) -> ExtOperator:
 @router.post("/auth/verify", response_model=ExtOperator)
 async def ext_verify_operator(
     payload: ExtVerifyRequest,
-    request: Request,
     _: ApiKey = Depends(require_api_key),
     db: AsyncSession = Depends(get_db),
 ) -> ExtOperator:
@@ -567,8 +560,11 @@ async def ext_verify_operator(
     (and could not be used if it were: the CMS hashes with pbkdf2_sha256 and
     the platform with bcrypt).
     """
-    client_ip = request.client.host if request.client else "unknown"
-    if auth_ratelimit.is_blocked(client_ip):
+    # Keyed on the account, NOT the caller's IP: the caller here is the Mark
+    # AI platform's server, so every operator in the fleet shares one IP and an
+    # IP-keyed cap would let ten fumbled passwords lock out every screen owner.
+    limiter_key = payload.email.lower().strip()
+    if auth_ratelimit.is_blocked(limiter_key):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many sign-in attempts. Try again in a few minutes.",
@@ -576,7 +572,7 @@ async def ext_verify_operator(
 
     user = await cms_user_service.authenticate(db, payload.email, payload.password)
     if user is None:
-        auth_ratelimit.record_failure(client_ip)
+        auth_ratelimit.record_failure(limiter_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
