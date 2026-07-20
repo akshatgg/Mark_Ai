@@ -1559,7 +1559,10 @@ async def describe_principal(db: AsyncSession, credentials) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
     payload = decode_access_token(credentials.credentials)
-    if not payload:
+    # The oauth_state guard mirrors get_current_user. It is not optional: this
+    # function hand-rolls credential resolution (it cannot use get_current_user,
+    # which 403s operators), so every check that lives there must live here too.
+    if not payload or payload.get("purpose") == "oauth_state":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
