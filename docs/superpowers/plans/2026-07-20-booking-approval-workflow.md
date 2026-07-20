@@ -3182,6 +3182,13 @@ export class ConsoleScene {
     this.animate();
   }
 
+  /** Draw exactly one frame. Needed because the render loop stops entirely
+   *  under prefers-reduced-motion, so anything that changes the image
+   *  afterwards (theme toggle, resize) must ask for a repaint itself. */
+  private renderOnce() {
+    this.renderer?.render(this.scene, this.camera);
+  }
+
   setTheme(theme: SceneTheme) {
     const dark = theme === "dark";
     this.scene.background = new THREE.Color(dark ? 0x04050a : 0xdfe7f2);
@@ -3191,6 +3198,7 @@ export class ConsoleScene {
       m.color.setHex(dark ? 0x0a0d16 : 0xb9c6da);
       m.emissiveIntensity = dark ? 1 : 0.25;
     });
+    if (this.reducedMotion) this.renderOnce();
   }
 
   private animate = () => {
@@ -3219,6 +3227,7 @@ export class ConsoleScene {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    if (this.reducedMotion) this.renderOnce();
   }
 
   dispose() {
