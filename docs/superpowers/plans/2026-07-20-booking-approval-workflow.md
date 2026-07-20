@@ -4,16 +4,19 @@
 
 **Goal:** An advertiser booking made on the Mark AI platform becomes a *request* that the screen's owner — or any superadmin — must approve before it is created in the CMS.
 
-**Architecture:** The pending request lives in the platform DB (`markai-backend-new`); the CMS learns nothing until approval, at which point the existing `cms_client.create_booking()` call runs. Screenowners sign into the platform with their CMS credentials, verified live over a new `/api/ext/auth/verify` endpoint (the two systems hash passwords differently and always will, so a live check is the only correct bridge).
+**Architecture:** The pending request lives in the platform DB (`markai-backend-new`); the CMS learns nothing until approval, at which point the existing `cms_client.create_booking()` call runs. CMS operators are identified by **email** (Phase 0 renames `cms_users.username` → `email`), and sign into the platform with that same credential, verified live over a new `/api/ext/auth/verify` endpoint — the two systems hash passwords differently and always will, so a live check is the only correct bridge. A **checkbox** on the sign-in page chooses which auth system to ask, because one email may legitimately exist in both.
 
-**Tech Stack:** FastAPI + async SQLAlchemy 2.0 + Alembic + pytest (both backends), Next.js 15 + React 19 + Tailwind + framer-motion + three@0.128.0 (frontend).
+**Tech Stack:** FastAPI + async SQLAlchemy 2.0 + Alembic + pytest (both backends), Next.js 15 + React 19 + Tailwind + framer-motion + three@0.128.0 (frontend), Next.js + vitest (CMS).
 
 **Spec:** `docs/superpowers/specs/2026-07-20-booking-approval-workflow-design.md`
 
 ## Global Constraints
 
-- All three repos are already on branch `feature/booking-approval`, cut from `main`. Do not create branches.
-- **`markai-Web-cms` is not touched by this plan.** It already creates screenowners with username + password + screen assignments + enrollment key.
+- All **four** repos are already on branch `feature/booking-approval`, cut from `main`. Do not create branches.
+- CMS operators are identified by `email`, never `username`. After Phase 0 the string `username` must not appear in `cms_users` code, the CMS login payload, or the ext auth contract.
+- The seeded superadmin is `admin@mark-ai.tech` / `Admin@123` (`SEED_SUPERADMIN_EMAIL` / `SEED_SUPERADMIN_PASSWORD`). This replaces the old `superadmin` username login — an accepted, deliberate change.
+- The sign-in checkbox reads exactly **"I'm a screen owner or administrator"**. Not "superadmin" — a screenowner who reads that leaves it unticked and is wrongly told no account exists.
+- `markai-Web-cms` test gate: `npm test` (vitest, `src/lib/` logic only — there is no component-testing setup and adding one is out of scope) plus `npm run build`.
 - **Never run `black` in either Python repo.** Neither `main` is black-clean; a repo-wide format would bury this change in an unrelated diff. Match surrounding hand-formatting.
 - `markai-signage-api` lint gate: `poetry run ruff check app/api_keys app/cms_users` must stay clean (it passes on `main` today). Ruff has 3 pre-existing failures elsewhere in `app/` — ignore them.
 - `markai-backend-new` test gate: `poetry run pytest -q` (15 tests pass on `main` today).
@@ -23,6 +26,231 @@
 - Roles are exactly `advertiser` (platform-native), `screenowner`, `superadmin`. Approval statuses are exactly `pending`, `approved`, `rejected`.
 - Production data is wiped before launch: no backfill logic, no data migration of existing sample rows.
 - Never commit `.env` or credentials. `CMS_EXT_*` values stay backend-only, never `NEXT_PUBLIC_*`.
+
+---
+
+# Phase 0 — CMS operators get an email
+
+Must land before Phase A: every later task speaks `email`.
+
+### Task A: `cms_users.username` → `cms_users.email`
+
+**Files:**
+- Create: `markai-signage-api/alembic/versions/0032_cms_user_email.py`
+- Modify: `markai-signage-api/app/cms_users/models.py:37-39`, `app/cms_users/schemas.py`, `app/cms_users/service.py`, `app/cms_users/router.py`, `app/core/config.py:63-64`, `app/gmail/service.py:66`
+- Test: `markai-signage-api/tests/test_cms.py` (update), `tests/test_enrollment.py` (update)
+
+**Interfaces:**
+- Produces: `CmsUser.email` (String(320), unique, indexed, not null); `LoginRequest{email, password}`; `CmsUserPublic.email`; `CreateUserRequest{email, password, role, ...}`; `service.authenticate(db, email, password)`; `seed_superadmin` seeds `settings.SEED_SUPERADMIN_EMAIL`.
+
+- [ ] **Step 1: Update the existing tests to the new field**
+
+Every test that logs in or creates a user currently sends `username`. In `tests/test_cms.py` and `tests/test_enrollment.py`, change every `"username": "superadmin"` to `"email": "admin@mark-ai.tech"`, every other `"username": "<name>"` in a create-user payload to `"email": "<name>@example.com"`, and every assertion reading `body["username"]` to `body["email"]`.
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `cd markai-signage-api && poetry run pytest tests/test_cms.py tests/test_enrollment.py -q`
+Expected: FAIL — 422 validation errors, because the request models still require `username`.
+
+- [ ] **Step 3: Rename the column on the model**
+
+In `markai-signage-api/app/cms_users/models.py`, replace the `username` column (lines 37-39) with:
+
+```python
+    email: Mapped[str] = mapped_column(
+        String(320), unique=True, index=True, nullable=False
+    )
+```
+
+- [ ] **Step 4: Update the schemas**
+
+In `markai-signage-api/app/cms_users/schemas.py`, replace `username` with `email` in `LoginRequest`, `CmsUserPublic` and `CreateUserRequest`. Use `EmailStr` so a malformed address is rejected at the edge:
+
+```python
+from pydantic import BaseModel, EmailStr, Field
+```
+
+```python
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+```
+
+```python
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=4)
+    role: Literal["superadmin", "screenowner"]
+    can_manage_api_keys: Optional[bool] = False
+    screen_ids: Optional[List[str]] = None
+```
+
+and in `CmsUserPublic` replace `username: str` with `email: EmailStr`.
+
+Confirm `email-validator` is available: it is already a dependency of this repo's Pydantic usage elsewhere; if `poetry run python -c "import email_validator"` fails, run `poetry add email-validator`.
+
+- [ ] **Step 5: Update the service and seed**
+
+In `markai-signage-api/app/cms_users/service.py`, in `to_public` replace `username=user.username` with `email=user.email`; in `authenticate` rename the parameter and the lookup:
+
+```python
+async def authenticate(
+    db: AsyncSession, email: str, password: str
+) -> Optional[CmsUser]:
+    """Return the user if credentials are valid and the user is active."""
+    user = (
+        await db.execute(select(CmsUser).where(CmsUser.email == email.lower().strip()))
+    ).scalar_one_or_none()
+    if user is None or not user.is_active:
+        return None
+    if not verify_password(password, user.password_hash):
+        return None
+    return user
+```
+
+In `create_user`, store the address lowercased (`email=payload.email.lower().strip()`), and in `seed_superadmin` use `settings.SEED_SUPERADMIN_EMAIL`.
+
+In `markai-signage-api/app/core/config.py`, replace `SEED_SUPERADMIN_USERNAME` (line 63) with:
+
+```python
+    SEED_SUPERADMIN_EMAIL: str = "admin@mark-ai.tech"
+```
+
+- [ ] **Step 6: Update the router and the Gmail placeholder**
+
+In `markai-signage-api/app/cms_users/router.py`, update the login handler to pass `payload.email`, and any log line or response referencing `username`.
+
+In `markai-signage-api/app/gmail/service.py:66`, replace the `f"{username}@gmail.com"` placeholder with the operator's real `email` — there is a real address now.
+
+- [ ] **Step 7: Write the migration**
+
+Create `markai-signage-api/alembic/versions/0032_cms_user_email.py`:
+
+```python
+"""CMS operators are identified by email, not username.
+
+One credential that works in the CMS and on the Mark AI platform. A straight
+rename: production is wiped before launch, so there is no backfill and no
+dual-read period to manage.
+
+Revision ID: 0032_cms_user_email
+Revises: 0031_booking_ext_attribution
+Create Date: 2026-07-20
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic.
+revision: str = "0032_cms_user_email"
+down_revision: Union[str, Sequence[str], None] = "0031_booking_ext_attribution"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.drop_index("ix_cms_users_username", table_name="cms_users")
+    op.alter_column(
+        "cms_users",
+        "username",
+        new_column_name="email",
+        existing_type=sa.String(length=255),
+        type_=sa.String(length=320),
+        existing_nullable=False,
+    )
+    op.create_index("ix_cms_users_email", "cms_users", ["email"], unique=True)
+
+
+def downgrade() -> None:
+    op.drop_index("ix_cms_users_email", table_name="cms_users")
+    op.alter_column(
+        "cms_users",
+        "email",
+        new_column_name="username",
+        existing_type=sa.String(length=320),
+        type_=sa.String(length=255),
+        existing_nullable=False,
+    )
+    op.create_index("ix_cms_users_username", "cms_users", ["username"], unique=True)
+```
+
+Before writing this, confirm the existing index name with
+`cd markai-signage-api && poetry run alembic upgrade head && psql postgresql://markai:markai@localhost:5433/markai_signage -c '\d cms_users'`
+and use the real name if it differs.
+
+- [ ] **Step 8: Run the tests**
+
+Run: `cd markai-signage-api && poetry run pytest -q`
+Expected: all pass.
+
+- [ ] **Step 9: Verify the migration and the seeded login**
+
+```bash
+cd markai-signage-api && poetry run alembic upgrade head
+poetry run pytest -q
+```
+Expected: migration applies cleanly; suite green.
+
+- [ ] **Step 10: Lint and commit**
+
+Run: `cd markai-signage-api && poetry run ruff check app/api_keys app/cms_users`
+Expected: `All checks passed!`
+
+```bash
+cd markai-signage-api
+git add app alembic tests
+git commit -m "feat(cms): identify operators by email instead of username"
+```
+
+---
+
+### Task B: The CMS asks for an email
+
+**Files:**
+- Modify: `markai-Web-cms/src/app/(dashboard)/users/page.tsx`, the login page under `markai-Web-cms/src/app/login/`, and the API client types (search for `username` under `src/lib/`)
+
+**Interfaces:**
+- Consumes: `CmsUserPublic.email`, `LoginRequest{email}`, `CreateUserRequest{email}` (Task A).
+
+- [ ] **Step 1: Find every `username` reference**
+
+Run: `cd markai-Web-cms && grep -rn "username" src/`
+Expected: a list covering the login page, the users page form + table, and the API types. That list is this task's work queue.
+
+- [ ] **Step 2: Update the API client types**
+
+In the file that declares the CMS user type and the login/create payloads (under `src/lib/`), rename `username: string` to `email: string` on the user type, the login request, and the create-user request.
+
+- [ ] **Step 3: Update the login page**
+
+Change the field to an email input: `type="email"`, label `Email`, `autoComplete="username"` (correct for a login identifier, email or not), placeholder `admin@mark-ai.tech`, and send `{ email, password }`.
+
+- [ ] **Step 4: Update the users page**
+
+In `markai-Web-cms/src/app/(dashboard)/users/page.tsx`:
+- rename the `username` state to `email` and its `FormField` to an email input with label `Email`, placeholder `owner@cafe.com`
+- change the validation at line 87 from `!username.trim()` to `!email.trim()`, and keep the min-4-character password rule
+- send `email: email.trim().toLowerCase()` in the create payload
+- replace `{u.username}` in both the desktop table and the mobile card list with `{u.email}`, and the column header `Username` with `Email`
+- update the delete confirmation text at line 131 to name the email
+
+- [ ] **Step 5: Verify**
+
+Run: `cd markai-Web-cms && npm test && npm run build`
+Expected: vitest suite green (it covers `src/lib/` logic, none of which changes), build succeeds.
+
+Run: `cd markai-Web-cms && grep -rn "username" src/`
+Expected: no matches except `autoComplete="username"`, which is the correct HTML value for a login identifier.
+
+- [ ] **Step 6: Commit**
+
+```bash
+cd markai-Web-cms
+git add src
+git commit -m "feat(users): create and sign in operators with an email"
+```
 
 ---
 
@@ -38,8 +266,8 @@ Two additive ext endpoints. No migration, no change to any existing route.
 - Test: `markai-signage-api/tests/test_ext_operator_auth.py`
 
 **Interfaces:**
-- Consumes: `cms_users.service.authenticate(db, username, password) -> Optional[CmsUser]`, `cms_users.service.get_assigned_screen_ids(db, user_id) -> List[str]`, `api_keys.deps.require_api_key`.
-- Produces: `POST /api/ext/auth/verify` → `ExtOperator{id, username, role, screen_ids, is_active}`; the `ExtOperator` pydantic model reused by Task 2.
+- Consumes: `cms_users.service.authenticate(db, email, password) -> Optional[CmsUser]`, `cms_users.service.get_assigned_screen_ids(db, user_id) -> List[str]`, `api_keys.deps.require_api_key`.
+- Produces: `POST /api/ext/auth/verify` → `ExtOperator{id, email, role, screen_ids, is_active}`; the `ExtOperator` pydantic model reused by Task 2.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -48,7 +276,7 @@ Create `markai-signage-api/tests/test_ext_operator_auth.py`:
 ```python
 """Ext operator auth: the Mark AI platform verifying a CMS credential.
 
-Contract: the platform sends a CMS username+password over its partner key and
+Contract: the platform sends a CMS email+password over its partner key and
 gets back the operator's role and the screens they own. Nothing else in the
 CMS is reachable this way.
 """
@@ -71,7 +299,7 @@ async def seeded(db_sessionmaker):
 async def _login(client):
     resp = await client.post(
         "/api/cms/auth/login",
-        json={"username": "superadmin", "password": "Admin@123"},
+        json={"email": "admin@mark-ai.tech", "password": "Admin@123"},
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["access_token"]
@@ -103,12 +331,12 @@ async def _register_screen(client, device_uid="op-auth-device"):
     return reg.json()["screen_id"]
 
 
-async def _make_owner(client, sa_token, username, screen_ids):
+async def _make_owner(client, sa_token, email, screen_ids):
     resp = await client.post(
         "/api/cms/users",
         headers=_bearer(sa_token),
         json={
-            "username": username,
+            "email": email,
             "password": "Owner@123",
             "role": "screenowner",
             "screen_ids": screen_ids,
@@ -122,17 +350,17 @@ async def test_verify_returns_role_and_owned_screens(client, seeded):
     sa_token = await _login(client)
     key = await _mint_key(client, sa_token)
     screen_id = await _register_screen(client)
-    owner = await _make_owner(client, sa_token, "bs", [screen_id])
+    owner = await _make_owner(client, sa_token, "bs@cafe.com", [screen_id])
 
     resp = await client.post(
         "/api/ext/auth/verify",
         headers=key,
-        json={"username": "bs", "password": "Owner@123"},
+        json={"email": "bs@cafe.com", "password": "Owner@123"},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["id"] == owner["id"]
-    assert body["username"] == "bs"
+    assert body["email"] == "bs"
     assert body["role"] == "screenowner"
     assert body["screen_ids"] == [screen_id]
     assert body["is_active"] is True
@@ -145,7 +373,7 @@ async def test_verify_superadmin_has_no_screen_ids(client, seeded):
     resp = await client.post(
         "/api/ext/auth/verify",
         headers=key,
-        json={"username": "superadmin", "password": "Admin@123"},
+        json={"email": "admin@mark-ai.tech", "password": "Admin@123"},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -157,19 +385,19 @@ async def test_verify_superadmin_has_no_screen_ids(client, seeded):
 async def test_verify_rejects_bad_password_and_unknown_user(client, seeded):
     sa_token = await _login(client)
     key = await _mint_key(client, sa_token)
-    await _make_owner(client, sa_token, "bs", [])
+    await _make_owner(client, sa_token, "bs@cafe.com", [])
 
     bad = await client.post(
         "/api/ext/auth/verify",
         headers=key,
-        json={"username": "bs", "password": "wrong"},
+        json={"email": "bs@cafe.com", "password": "wrong"},
     )
     assert bad.status_code == 401
 
     unknown = await client.post(
         "/api/ext/auth/verify",
         headers=key,
-        json={"username": "nobody", "password": "Owner@123"},
+        json={"email": "nobody@cafe.com", "password": "Owner@123"},
     )
     assert unknown.status_code == 401
 
@@ -177,7 +405,7 @@ async def test_verify_rejects_bad_password_and_unknown_user(client, seeded):
 async def test_verify_requires_a_partner_key(client, seeded):
     resp = await client.post(
         "/api/ext/auth/verify",
-        json={"username": "superadmin", "password": "Admin@123"},
+        json={"email": "admin@mark-ai.tech", "password": "Admin@123"},
     )
     assert resp.status_code == 401
 
@@ -185,20 +413,20 @@ async def test_verify_requires_a_partner_key(client, seeded):
 async def test_verify_rate_limits_repeated_failures(client, seeded):
     sa_token = await _login(client)
     key = await _mint_key(client, sa_token)
-    await _make_owner(client, sa_token, "bs", [])
+    await _make_owner(client, sa_token, "bs@cafe.com", [])
 
     for _ in range(10):
         resp = await client.post(
             "/api/ext/auth/verify",
             headers=key,
-            json={"username": "bs", "password": "wrong"},
+            json={"email": "bs@cafe.com", "password": "wrong"},
         )
         assert resp.status_code == 401
 
     blocked = await client.post(
         "/api/ext/auth/verify",
         headers=key,
-        json={"username": "bs", "password": "Owner@123"},
+        json={"email": "bs@cafe.com", "password": "Owner@123"},
     )
     assert blocked.status_code == 429
 ```
@@ -215,7 +443,7 @@ Create `markai-signage-api/app/cms_users/auth_ratelimit.py`:
 ```python
 """Brute-force speed bump for operator credential verification.
 
-`POST /api/ext/auth/verify` lets a partner check a CMS username+password. The
+`POST /api/ext/auth/verify` lets a partner check a CMS email+password. The
 partner key already gates who may ask, but a leaked key must not become an
 offline-speed password oracle against every operator account, so failed
 attempts are capped per source IP.
@@ -291,7 +519,7 @@ Append to the **end** of the file:
 
 
 class ExtVerifyRequest(BaseModel):
-    username: str
+    email: str
     password: str
 
 
@@ -303,7 +531,7 @@ class ExtOperator(BaseModel):
     """
 
     id: str
-    username: str
+    email: str
     role: str
     screen_ids: List[str] = []
     is_active: bool = True
@@ -317,7 +545,7 @@ async def _to_ext_operator(db: AsyncSession, user: CmsUser) -> ExtOperator:
     )
     return ExtOperator(
         id=user.id,
-        username=user.username,
+        email=user.email,
         role=user.role,
         screen_ids=screen_ids,
         is_active=user.is_active,
@@ -331,7 +559,7 @@ async def ext_verify_operator(
     _: ApiKey = Depends(require_api_key),
     db: AsyncSession = Depends(get_db),
 ) -> ExtOperator:
-    """Verify a CMS username+password and return who they are.
+    """Verify a CMS email+password and return who they are.
 
     The platform calls this so a screenowner can sign in there with the
     credentials the superadmin issued in the CMS. The CMS stays the single
@@ -346,12 +574,12 @@ async def ext_verify_operator(
             detail="Too many sign-in attempts. Try again in a few minutes.",
         )
 
-    user = await cms_user_service.authenticate(db, payload.username, payload.password)
+    user = await cms_user_service.authenticate(db, payload.email, payload.password)
     if user is None:
         auth_ratelimit.record_failure(client_ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail="Invalid email or password",
         )
     return await _to_ext_operator(db, user)
 ```
@@ -398,7 +626,7 @@ async def test_scope_reflects_reassignment_and_deactivation(client, seeded):
     key = await _mint_key(client, sa_token)
     screen_a = await _register_screen(client, "scope-a")
     screen_b = await _register_screen(client, "scope-b")
-    owner = await _make_owner(client, sa_token, "bs", [screen_a])
+    owner = await _make_owner(client, sa_token, "bs@cafe.com", [screen_a])
 
     scope = await client.get(f"/api/ext/operators/{owner['id']}/scope", headers=key)
     assert scope.status_code == 200, scope.text
@@ -503,7 +731,7 @@ git commit -m "feat(ext): live operator scope lookup for approval authority"
 - Test: `markai-backend-new/tests/test_approvals.py`
 
 **Interfaces:**
-- Produces: `Booking.approval_status` (`pending`|`approved`|`rejected`), `Booking.cms_booking_id` now `Optional[str]`, `Booking.decided_by_cms_user_id/decided_by_username/decided_by_role/decided_at/reject_reason`; `BookingOut.approval_status`, `BookingOut.reject_reason`, `BookingOut.cms_booking_id: Optional[str]`; `to_out()` maps a pending row to `status="pending_approval"` and a rejected one to `status="rejected"`.
+- Produces: `Booking.approval_status` (`pending`|`approved`|`rejected`), `Booking.cms_booking_id` now `Optional[str]`, `Booking.decided_by_cms_user_id/decided_by_email/decided_by_role/decided_at/reject_reason`; `BookingOut.approval_status`, `BookingOut.reject_reason`, `BookingOut.cms_booking_id: Optional[str]`; `to_out()` maps a pending row to `status="pending_approval"` and a rejected one to `status="rejected"`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -643,7 +871,7 @@ Insert after the `status_cache` column (after line 57):
     decided_by_cms_user_id: Mapped[str | None] = mapped_column(
         String(36), nullable=True
     )
-    decided_by_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    decided_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     decided_by_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -758,7 +986,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "bookings",
-        sa.Column("decided_by_username", sa.String(length=255), nullable=True),
+        sa.Column("decided_by_email", sa.String(length=255), nullable=True),
     )
     op.add_column(
         "bookings", sa.Column("decided_by_role", sa.String(length=32), nullable=True)
@@ -781,7 +1009,7 @@ def downgrade() -> None:
     op.drop_column("bookings", "reject_reason")
     op.drop_column("bookings", "decided_at")
     op.drop_column("bookings", "decided_by_role")
-    op.drop_column("bookings", "decided_by_username")
+    op.drop_column("bookings", "decided_by_email")
     op.drop_column("bookings", "decided_by_cms_user_id")
     op.drop_column("bookings", "approval_status")
     op.alter_column(
@@ -823,9 +1051,9 @@ git commit -m "feat(bookings): approval columns, nullable CMS twin id"
 
 **Interfaces:**
 - Produces:
-  - `cms_client.verify_operator(username, password) -> dict` and `cms_client.get_operator_scope(cms_user_id) -> dict`, both returning `{id, username, role, screen_ids, is_active}`.
-  - `security.Operator` dataclass with `.id`, `.username`, `.role`.
-  - `security.create_operator_token(cms_user_id, username, role) -> str`.
+  - `cms_client.verify_operator(email, password) -> dict` and `cms_client.get_operator_scope(cms_user_id) -> dict`, both returning `{id, email, role, screen_ids, is_active}`.
+  - `security.Operator` dataclass with `.id`, `.email`, `.role`.
+  - `security.create_operator_token(cms_user_id, email, role) -> str`.
   - `security.require_operator` FastAPI dependency → `Operator`, 401 otherwise.
   - `get_current_user` now explicitly rejects an operator token.
 
@@ -850,11 +1078,11 @@ from app.core.security import (
 
 
 def test_operator_token_carries_role_and_namespaced_subject():
-    token = create_operator_token("cms-user-1", "bs", "screenowner")
+    token = create_operator_token("cms-user-1", "bs@cafe.com", "screenowner")
     payload = decode_access_token(token)
 
     assert payload["sub"] == "cms:cms-user-1"
-    assert payload["username"] == "bs"
+    assert payload["email"] == "bs"
     assert payload["role"] == "screenowner"
 
 
@@ -867,9 +1095,9 @@ def test_advertiser_token_is_marked_advertiser():
 
 
 def test_operator_dataclass_round_trips():
-    op = Operator(id="cms-user-1", username="bs", role="screenowner")
+    op = Operator(id="cms-user-1", email="bs@cafe.com", role="screenowner")
     assert op.is_superadmin is False
-    assert Operator(id="x", username="root", role="superadmin").is_superadmin is True
+    assert Operator(id="x", email="admin@mark-ai.tech", role="superadmin").is_superadmin is True
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -884,10 +1112,10 @@ In `markai-backend-new/app/cms/client.py`, insert immediately before the final `
 ```python
     # --- Operator identity ----------------------------------------------------
 
-    async def verify_operator(self, username: str, password: str) -> dict:
-        """Check a CMS username+password. 401 passes through as 401."""
+    async def verify_operator(self, email: str, password: str) -> dict:
+        """Check a CMS email+password. 401 passes through as 401."""
         return await self._request(
-            "POST", "/auth/verify", json={"username": username, "password": password}
+            "POST", "/auth/verify", json={"email": email, "password": password}
         )
 
     async def get_operator_scope(self, cms_user_id: str) -> dict:
@@ -919,7 +1147,7 @@ def create_access_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
-def create_operator_token(cms_user_id: str, username: str, role: str) -> str:
+def create_operator_token(cms_user_id: str, email: str, role: str) -> str:
     """Token for a CMS operator (screenowner or superadmin).
 
     The subject is namespaced `cms:<id>` because that identity lives in the
@@ -929,7 +1157,7 @@ def create_operator_token(cms_user_id: str, username: str, role: str) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": f"cms:{cms_user_id}",
-        "username": username,
+        "email": email,
         "role": role,
         "iat": now,
         "exp": now + timedelta(hours=settings.JWT_EXPIRE_HOURS),
@@ -945,7 +1173,7 @@ class Operator:
     """A signed-in CMS operator. Not a row in this database."""
 
     id: str
-    username: str
+    email: str
     role: str
 
     @property
@@ -962,7 +1190,7 @@ def operator_from_payload(payload: dict) -> Optional[Operator]:
         return None
     return Operator(
         id=sub[len("cms:") :],
-        username=payload.get("username") or "",
+        email=payload.get("email") or "",
         role=payload["role"],
     )
 ```
@@ -1034,9 +1262,13 @@ git commit -m "feat(auth): operator principal, tokens and CMS verification calls
 
 ---
 
-### Task 5: Identifier-based login routing
+### Task 5: The checkbox chooses the auth system
 
-Email → the platform's own `users` table. Bare username → the CMS.
+Unticked, sign-in hits the platform's own `users` table exactly as it does today.
+Ticked, it hits the CMS. Note what this does **not** change: `identify` keeps its
+current request and response shape, because it only ever runs for advertisers — an
+operator's account cannot be probed without a password, and probing the CMS would
+leak which operator accounts exist.
 
 **Files:**
 - Modify: `markai-backend-new/app/users/schemas.py`, `markai-backend-new/app/users/service.py`, `markai-backend-new/app/users/router.py`
@@ -1045,17 +1277,23 @@ Email → the platform's own `users` table. Bare username → the CMS.
 **Interfaces:**
 - Consumes: `cms_client.verify_operator`, `security.create_operator_token`, `security.Operator` (Task 4).
 - Produces:
-  - `POST /api/auth/identify {identifier}` → `{kind: "advertiser"|"operator", exists, has_password, google_linked, first_name}`.
-  - `POST /api/auth/login {identifier, password}` → `AuthResponse{access_token, token_type, role, user?, operator?}`.
-  - `GET /api/auth/me` → `MeResponse{role, id, email?, username?, first_name?, last_name?, avatar_url?, google_linked, has_password}` for both principal kinds.
-  - `OperatorOut{id, username, role}`.
+  - `POST /api/auth/login {email, password, as_operator?: bool}` → `AuthResponse{access_token, token_type, role, user?, operator?}`.
+  - `GET /api/auth/me` → `MeResponse{role, id, email, first_name?, last_name?, avatar_url?, google_linked, has_password}` for both principal kinds.
+  - `OperatorOut{id, email, role}`.
+  - `service.login_advertiser` (the former `service.login`, renamed) and `service.login_operator(email, password)`.
+  - `POST /api/auth/identify` is **unchanged**.
 
 - [ ] **Step 1: Write the failing test**
 
 Create `markai-backend-new/tests/test_operator_login.py`:
 
 ```python
-"""The routing rule: an email signs in here, a bare username signs in via the CMS."""
+"""The checkbox decides which auth system answers.
+
+Once CMS operators have emails, one address can legitimately exist in both
+systems — a cafe owner who also buys ads. Nothing about the address can
+disambiguate them, so the caller declares it.
+"""
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -1094,53 +1332,36 @@ async def client():
     await engine.dispose()
 
 
-def _stub_verify(monkeypatch, result):
-    async def fake_verify(username, password):
-        if password != "Owner@123":
+def _stub_verify(monkeypatch, result, good_password="Owner@123"):
+    async def fake_verify(email, password):
+        if password != good_password:
             from fastapi import HTTPException
 
-            raise HTTPException(status_code=401, detail="Invalid username or password")
+            raise HTTPException(status_code=401, detail="Invalid email or password")
         return result
 
     monkeypatch.setattr("app.users.service.cms_client.verify_operator", fake_verify)
 
 
-async def test_identify_routes_a_bare_username_to_the_cms(client):
-    resp = await client.post("/api/auth/identify", json={"identifier": "bs"})
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["kind"] == "operator"
+OPERATOR = {
+    "id": "cms-1",
+    "email": "bs@cafe.com",
+    "role": "screenowner",
+    "screen_ids": ["screen-b"],
+    "is_active": True,
+}
 
 
-async def test_identify_still_probes_the_platform_for_an_email(client):
-    await client.post("/api/auth/signup", json=SIGNUP)
+async def test_ticking_the_box_signs_in_through_the_cms(client, monkeypatch):
+    _stub_verify(monkeypatch, OPERATOR)
     resp = await client.post(
-        "/api/auth/identify", json={"identifier": "ada@example.com"}
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["kind"] == "advertiser"
-    assert body["exists"] is True
-    assert body["has_password"] is True
-
-
-async def test_operator_login_returns_an_operator_token(client, monkeypatch):
-    _stub_verify(
-        monkeypatch,
-        {
-            "id": "cms-1",
-            "username": "bs",
-            "role": "screenowner",
-            "screen_ids": ["screen-b"],
-            "is_active": True,
-        },
-    )
-    resp = await client.post(
-        "/api/auth/login", json={"identifier": "bs", "password": "Owner@123"}
+        "/api/auth/login",
+        json={"email": "bs@cafe.com", "password": "Owner@123", "as_operator": True},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["role"] == "screenowner"
-    assert body["operator"]["username"] == "bs"
+    assert body["operator"]["email"] == "bs@cafe.com"
     assert body["user"] is None
 
     me = await client.get(
@@ -1148,80 +1369,108 @@ async def test_operator_login_returns_an_operator_token(client, monkeypatch):
     )
     assert me.status_code == 200, me.text
     assert me.json()["role"] == "screenowner"
-    assert me.json()["username"] == "bs"
+    assert me.json()["email"] == "bs@cafe.com"
+
+
+async def test_leaving_the_box_unticked_never_asks_the_cms(client, monkeypatch):
+    called = []
+
+    async def fake_verify(email, password):
+        called.append(email)
+        return OPERATOR
+
+    monkeypatch.setattr("app.users.service.cms_client.verify_operator", fake_verify)
+    await client.post("/api/auth/signup", json=SIGNUP)
+
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": "ada@example.com", "password": SIGNUP["password"]},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["role"] == "advertiser"
+    assert resp.json()["operator"] is None
+    assert called == []
+
+
+async def test_one_email_can_hold_both_accounts(client, monkeypatch):
+    """The whole reason the checkbox exists rather than inspecting the address."""
+    shared = "owner@cafe.com"
+    await client.post(
+        "/api/auth/signup",
+        json={
+            "email": shared,
+            "first_name": "Cafe",
+            "last_name": "Owner",
+            "password": "Advertiser@1",
+        },
+    )
+    _stub_verify(
+        monkeypatch,
+        {**OPERATOR, "email": shared},
+        good_password="Operator@1",
+    )
+
+    as_advertiser = await client.post(
+        "/api/auth/login", json={"email": shared, "password": "Advertiser@1"}
+    )
+    assert as_advertiser.json()["role"] == "advertiser"
+
+    as_operator = await client.post(
+        "/api/auth/login",
+        json={"email": shared, "password": "Operator@1", "as_operator": True},
+    )
+    assert as_operator.json()["role"] == "screenowner"
 
 
 async def test_operator_login_passes_the_cms_401_through(client, monkeypatch):
-    _stub_verify(monkeypatch, {})
+    _stub_verify(monkeypatch, OPERATOR)
     resp = await client.post(
-        "/api/auth/login", json={"identifier": "bs", "password": "nope"}
+        "/api/auth/login",
+        json={"email": "bs@cafe.com", "password": "nope", "as_operator": True},
     )
     assert resp.status_code == 401
 
 
 async def test_inactive_operator_cannot_sign_in(client, monkeypatch):
-    _stub_verify(
-        monkeypatch,
-        {
-            "id": "cms-1",
-            "username": "bs",
-            "role": "screenowner",
-            "screen_ids": [],
-            "is_active": False,
-        },
-    )
+    _stub_verify(monkeypatch, {**OPERATOR, "is_active": False})
     resp = await client.post(
-        "/api/auth/login", json={"identifier": "bs", "password": "Owner@123"}
+        "/api/auth/login",
+        json={"email": "bs@cafe.com", "password": "Owner@123", "as_operator": True},
     )
     assert resp.status_code == 403
 
 
-async def test_advertiser_login_still_works_and_me_reports_advertiser(client):
+async def test_advertiser_me_still_reports_advertiser(client):
     await client.post("/api/auth/signup", json=SIGNUP)
     resp = await client.post(
         "/api/auth/login",
-        json={"identifier": "ada@example.com", "password": SIGNUP["password"]},
+        json={"email": "ada@example.com", "password": SIGNUP["password"]},
     )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["role"] == "advertiser"
-    assert body["user"]["email"] == "ada@example.com"
-    assert body["operator"] is None
-
     me = await client.get(
-        "/api/auth/me", headers={"Authorization": f"Bearer {body['access_token']}"}
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {resp.json()['access_token']}"},
     )
     assert me.json()["role"] == "advertiser"
     assert me.json()["email"] == "ada@example.com"
+    assert me.json()["first_name"] == "Ada"
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd markai-backend-new && poetry run pytest tests/test_operator_login.py -q`
-Expected: FAIL — 422 on `identify`, because the request model still requires `email`.
+Expected: FAIL — the operator sign-ins return 404 `unknown_email`, because `as_operator` is ignored and every login goes to the platform table.
 
 - [ ] **Step 3: Update the schemas**
 
-In `markai-backend-new/app/users/schemas.py`, replace `IdentifyRequest`, `IdentifyResponse` and `LoginRequest` (lines 9-29) with:
+In `markai-backend-new/app/users/schemas.py`, replace `LoginRequest` (lines 27-29) with:
 
 ```python
-class IdentifyRequest(BaseModel):
-    """An email or a bare CMS username — the shape decides where we look."""
-
-    identifier: str = Field(min_length=1, max_length=320)
-
-
-class IdentifyResponse(BaseModel):
-    kind: str = "advertiser"  # advertiser | operator
-    exists: bool = False
-    has_password: bool = False
-    google_linked: bool = False
-    first_name: Optional[str] = None
-
-
 class LoginRequest(BaseModel):
-    identifier: str = Field(min_length=1, max_length=320)
+    email: EmailStr
     password: str
+    # Ticked on the sign-in page by a screen owner or administrator. One email
+    # may exist in both systems, so the caller declares which one they mean.
+    as_operator: bool = False
 ```
 
 Replace `AuthResponse` (lines 54-57) with:
@@ -1231,7 +1480,7 @@ class OperatorOut(BaseModel):
     """A CMS operator signed into the platform."""
 
     id: str
-    username: str
+    email: EmailStr
     role: str
 
 
@@ -1248,8 +1497,7 @@ class MeResponse(BaseModel):
 
     role: str
     id: str
-    email: Optional[str] = None
-    username: Optional[str] = None
+    email: EmailStr
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -1257,58 +1505,34 @@ class MeResponse(BaseModel):
     has_password: bool = False
 ```
 
+`IdentifyRequest` and `IdentifyResponse` are unchanged.
+
 - [ ] **Step 4: Update the service**
 
-In `markai-backend-new/app/users/service.py`, add to the imports:
+In `markai-backend-new/app/users/service.py`, add the imports:
 
 ```python
 from app.cms.client import cms_client
 from app.core.security import Operator
 ```
 
-Add a helper below `_aware` (after line 47):
+Rename the existing `login` to `login_advertiser` — change only the `def` line at 91, the body is unchanged:
 
 ```python
-def looks_like_email(identifier: str) -> bool:
-    """The routing rule: an "@" means a platform account, anything else is a
-    CMS operator username. Deliberately shape-based, so an advertiser sign-in
-    never costs a round-trip to the CMS."""
-    return "@" in identifier
+async def login_advertiser(db: AsyncSession, email: str, password: str) -> User:
 ```
 
-Replace `identify` (lines 55-64) with:
+Append the operator path after it:
 
 ```python
-async def identify(db: AsyncSession, identifier: str) -> dict:
-    identifier = identifier.strip()
-    if not looks_like_email(identifier):
-        # Deliberately does NOT ask the CMS whether this username exists:
-        # verifying requires the password, and answering here would leak
-        # which operator accounts are real.
-        return {"kind": "operator"}
-    user = await get_user_by_email(db, identifier)
-    if user is None:
-        return {"kind": "advertiser", "exists": False}
-    return {
-        "kind": "advertiser",
-        "exists": True,
-        "has_password": bool(user.password_hash),
-        "google_linked": bool(user.google_sub),
-        "first_name": user.first_name,
-    }
-```
-
-Rename the existing `login` to `login_advertiser` (change only the `def` line at 91; the body is unchanged) and append a new operator path after it:
-
-```python
-async def login_operator(username: str, password: str) -> Operator:
+async def login_operator(email: str, password: str) -> Operator:
     """Verify a CMS credential against the CMS and return the operator.
 
     The CMS's 401 passes straight through; an operator the superadmin has
     deactivated is refused here rather than being handed a token that every
     later call would reject anyway.
     """
-    data = await cms_client.verify_operator(username.strip(), password)
+    data = await cms_client.verify_operator(email.lower().strip(), password)
     if not data.get("is_active", True):
         raise _err(
             status.HTTP_403_FORBIDDEN,
@@ -1316,73 +1540,9 @@ async def login_operator(username: str, password: str) -> Operator:
             "This account has been deactivated. Ask your administrator to "
             "re-enable it.",
         )
-    return Operator(
-        id=data["id"], username=data["username"], role=data["role"]
-    )
-```
-
-- [ ] **Step 5: Update the router**
-
-In `markai-backend-new/app/users/router.py`, extend the schema import block (lines 14-24) to include `MeResponse` and `OperatorOut`, and the security import (line 12) to include `create_operator_token`, `require_operator` and `get_optional_user`:
-
-```python
-from app.core.security import (
-    create_access_token,
-    create_operator_token,
-    get_current_user,
-    require_operator,
-)
-```
-
-Replace `identify` and `login` (lines 37-54) with:
-
-```python
-@router.post("/identify", response_model=IdentifyResponse)
-async def identify(body: IdentifyRequest, db: AsyncSession = Depends(get_db)):
-    """First step: is this an advertiser email or a CMS operator username?"""
-    return await service.identify(db, body.identifier)
+    return Operator(id=data["id"], email=data["email"], role=data["role"])
 
 
-@router.post("/login", response_model=AuthResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    if not service.looks_like_email(body.identifier):
-        operator = await service.login_operator(body.identifier, body.password)
-        return AuthResponse(
-            access_token=create_operator_token(
-                operator.id, operator.username, operator.role
-            ),
-            role=operator.role,
-            operator=OperatorOut(
-                id=operator.id, username=operator.username, role=operator.role
-            ),
-        )
-    user = await service.login_advertiser(db, body.identifier, body.password)
-    return _auth_response(user)
-```
-
-Replace `me` (lines 106-108) with:
-
-```python
-@router.get("/me", response_model=MeResponse)
-async def me(
-    credentials=Depends(_bearer_for_me),
-    db: AsyncSession = Depends(get_db),
-):
-    """One endpoint for both principal kinds — the frontend keeps one session."""
-    return await service.describe_principal(db, credentials)
-```
-
-That needs a shared bearer + a describer. Add near the top of `router.py`, after `router = APIRouter(...)`:
-
-```python
-from fastapi.security import HTTPBearer
-
-_bearer_for_me = HTTPBearer(auto_error=False)
-```
-
-And add to `markai-backend-new/app/users/service.py`:
-
-```python
 async def describe_principal(db: AsyncSession, credentials) -> dict:
     """Resolve a bearer credential into the unified /me shape."""
     from app.core.security import decode_access_token, operator_from_payload
@@ -1400,11 +1560,7 @@ async def describe_principal(db: AsyncSession, credentials) -> dict:
 
     operator = operator_from_payload(payload)
     if operator is not None:
-        return {
-            "role": operator.role,
-            "id": operator.id,
-            "username": operator.username,
-        }
+        return {"role": operator.role, "id": operator.id, "email": operator.email}
 
     user = (
         await db.execute(select(User).where(User.id == payload.get("sub")))
@@ -1426,16 +1582,62 @@ async def describe_principal(db: AsyncSession, credentials) -> dict:
     }
 ```
 
-Also update the Google callback and reset-password paths, which still call the old name. In `router.py` the `_auth_response` helper is unchanged; in `service.py`, `reset_password` returns a `User` and needs no change. Search for any remaining `service.login(` and change it to `service.login_advertiser(`.
+- [ ] **Step 5: Update the router**
+
+In `markai-backend-new/app/users/router.py`, extend the schema import block (lines 14-24) with `MeResponse` and `OperatorOut`, and replace the security import (line 12) with:
+
+```python
+from app.core.security import create_access_token, create_operator_token, get_current_user
+```
+
+Add below `router = APIRouter(...)`:
+
+```python
+from fastapi.security import HTTPBearer
+
+_me_bearer = HTTPBearer(auto_error=False)
+```
+
+Replace `login` (lines 51-54) with:
+
+```python
+@router.post("/login", response_model=AuthResponse)
+async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """Sign in. `as_operator` sends the credential to the CMS instead of here."""
+    if body.as_operator:
+        operator = await service.login_operator(body.email, body.password)
+        return AuthResponse(
+            access_token=create_operator_token(
+                operator.id, operator.email, operator.role
+            ),
+            role=operator.role,
+            operator=OperatorOut(
+                id=operator.id, email=operator.email, role=operator.role
+            ),
+        )
+    user = await service.login_advertiser(db, body.email, body.password)
+    return _auth_response(user)
+```
+
+Replace `me` (lines 106-108) with:
+
+```python
+@router.get("/me", response_model=MeResponse)
+async def me(credentials=Depends(_me_bearer), db: AsyncSession = Depends(get_db)):
+    """One endpoint for both principal kinds — the frontend keeps one session."""
+    return await service.describe_principal(db, credentials)
+```
+
+Search for any remaining `service.login(` and change it to `service.login_advertiser(`.
 
 - [ ] **Step 6: Run the tests**
 
 Run: `cd markai-backend-new && poetry run pytest tests/test_operator_login.py -q`
 Expected: PASS — 6 passed.
 
-- [ ] **Step 7: Fix the existing auth tests**
+- [ ] **Step 7: Run the full suite**
 
-`tests/test_auth.py` posts `{"email": ...}` to `/identify` and `/login`. Update those call sites to `{"identifier": ...}`, and update assertions that read `r.json()["user"]["..."]` on a login response (the shape still has `user`, so most are unaffected; `identify` assertions on `exists` now also carry `kind`).
+`tests/test_auth.py` asserts on `/auth/me`, whose response no longer carries `created_at` and now always carries `role`. Update those assertions; the `/login` and `/identify` payloads are unchanged.
 
 Run: `cd markai-backend-new && poetry run pytest -q`
 Expected: all pass.
@@ -1445,7 +1647,7 @@ Expected: all pass.
 ```bash
 cd markai-backend-new
 git add app/users tests/test_operator_login.py tests/test_auth.py
-git commit -m "feat(auth): route email to the platform and username to the CMS"
+git commit -m "feat(auth): as_operator flag routes sign-in to the CMS"
 ```
 
 ---
@@ -1816,10 +2018,10 @@ def _stub_scope(monkeypatch, scope):
     )
 
 
-def _operator_token(cms_user_id, username, role):
+def _operator_token(cms_user_id, email, role):
     from app.core.security import create_operator_token
 
-    return create_operator_token(cms_user_id, username, role)
+    return create_operator_token(cms_user_id, email, role)
 
 
 async def _pending_booking(client, monkeypatch, screen_id="screen-b"):
@@ -1862,7 +2064,7 @@ async def test_owner_sees_only_their_screens_superadmin_sees_all(client, monkeyp
     )
     other = await client.get(
         "/api/approvals",
-        headers={"Authorization": f"Bearer {_operator_token('o2', 'as', 'screenowner')}"},
+        headers={"Authorization": f"Bearer {_operator_token('o2', 'as@cafe.com', 'screenowner')}"},
     )
     assert other.status_code == 200, other.text
     assert other.json()["total"] == 0
@@ -1873,7 +2075,7 @@ async def test_owner_sees_only_their_screens_superadmin_sees_all(client, monkeyp
     )
     mine = await client.get(
         "/api/approvals",
-        headers={"Authorization": f"Bearer {_operator_token('o1', 'bs', 'screenowner')}"},
+        headers={"Authorization": f"Bearer {_operator_token('o1', 'bs@cafe.com', 'screenowner')}"},
     )
     assert mine.json()["total"] == 1
     assert mine.json()["requests"][0]["id"] == booking_id
@@ -1887,7 +2089,7 @@ async def test_ownerless_screen_still_reaches_the_superadmin(client, monkeypatch
     )
     resp = await client.get(
         "/api/approvals",
-        headers={"Authorization": f"Bearer {_operator_token('sa', 'root', 'superadmin')}"},
+        headers={"Authorization": f"Bearer {_operator_token('sa', 'admin@mark-ai.tech', 'superadmin')}"},
     )
     assert resp.json()["total"] == 1
 
@@ -1905,14 +2107,14 @@ async def test_approve_creates_the_cms_booking_once(client, monkeypatch):
         monkeypatch,
         {"role": "screenowner", "screen_ids": ["screen-b"], "is_active": True},
     )
-    headers = {"Authorization": f"Bearer {_operator_token('o1', 'bs', 'screenowner')}"}
+    headers = {"Authorization": f"Bearer {_operator_token('o1', 'bs@cafe.com', 'screenowner')}"}
 
     resp = await client.post(f"/api/approvals/{booking_id}/approve", headers=headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["approval_status"] == "approved"
     assert body["cms_booking_id"] == "cms-77"
-    assert body["decided_by_username"] == "bs"
+    assert body["decided_by_email"] == "bs"
     assert len(created) == 1
     assert created[0]["external_ref"]["order_id"] == booking_id
 
@@ -1930,7 +2132,7 @@ async def test_non_owner_cannot_approve(client, monkeypatch):
     )
     resp = await client.post(
         f"/api/approvals/{booking_id}/approve",
-        headers={"Authorization": f"Bearer {_operator_token('o2', 'as', 'screenowner')}"},
+        headers={"Authorization": f"Bearer {_operator_token('o2', 'as@cafe.com', 'screenowner')}"},
     )
     assert resp.status_code == 403
 
@@ -1949,7 +2151,7 @@ async def test_reject_never_calls_the_cms(client, monkeypatch):
     )
     resp = await client.post(
         f"/api/approvals/{booking_id}/reject",
-        headers={"Authorization": f"Bearer {_operator_token('sa', 'root', 'superadmin')}"},
+        headers={"Authorization": f"Bearer {_operator_token('sa', 'admin@mark-ai.tech', 'superadmin')}"},
         json={"reason": "Creative is off-brand for this venue."},
     )
     assert resp.status_code == 200, resp.text
@@ -1973,7 +2175,7 @@ async def test_cms_failure_on_approve_leaves_the_request_pending(client, monkeyp
         monkeypatch,
         {"role": "screenowner", "screen_ids": ["screen-b"], "is_active": True},
     )
-    headers = {"Authorization": f"Bearer {_operator_token('o1', 'bs', 'screenowner')}"}
+    headers = {"Authorization": f"Bearer {_operator_token('o1', 'bs@cafe.com', 'screenowner')}"}
 
     resp = await client.post(f"/api/approvals/{booking_id}/approve", headers=headers)
     assert resp.status_code == 422
@@ -1992,7 +2194,7 @@ async def test_deactivated_operator_is_refused(client, monkeypatch):
     )
     resp = await client.get(
         "/api/approvals",
-        headers={"Authorization": f"Bearer {_operator_token('o1', 'bs', 'screenowner')}"},
+        headers={"Authorization": f"Bearer {_operator_token('o1', 'bs@cafe.com', 'screenowner')}"},
     )
     assert resp.status_code == 403
 
@@ -2000,7 +2202,7 @@ async def test_deactivated_operator_is_refused(client, monkeypatch):
 async def test_an_operator_token_cannot_book(client, monkeypatch):
     resp = await client.post(
         "/api/bookings",
-        headers={"Authorization": f"Bearer {_operator_token('o1', 'bs', 'screenowner')}"},
+        headers={"Authorization": f"Bearer {_operator_token('o1', 'bs@cafe.com', 'screenowner')}"},
         json={
             "name": "Nike",
             "screen_id": "screen-b",
@@ -2055,7 +2257,7 @@ class ApprovalOut(BaseModel):
     target_plays_per_day: Optional[int] = None
     approval_status: str
     cms_booking_id: Optional[str] = None
-    decided_by_username: Optional[str] = None
+    decided_by_email: Optional[str] = None
     decided_by_role: Optional[str] = None
     decided_at: Optional[datetime] = None
     reject_reason: Optional[str] = None
@@ -2163,7 +2365,7 @@ def _to_out(
         target_plays_per_day=booking.target_plays_per_day,
         approval_status=booking.approval_status,
         cms_booking_id=booking.cms_booking_id,
-        decided_by_username=booking.decided_by_username,
+        decided_by_email=booking.decided_by_email,
         decided_by_role=booking.decided_by_role,
         decided_at=booking.decided_at,
         reject_reason=booking.reject_reason,
@@ -2257,8 +2459,8 @@ async def _load_for_decision(
             detail=(
                 f"This request was already {booking.approval_status}"
                 + (
-                    f" by {booking.decided_by_username}."
-                    if booking.decided_by_username
+                    f" by {booking.decided_by_email}."
+                    if booking.decided_by_email
                     else "."
                 )
             ),
@@ -2334,14 +2536,14 @@ async def approve(
     booking.status_cache = cms_booking.get("status", "active")
     booking.approval_status = "approved"
     booking.decided_by_cms_user_id = operator.id
-    booking.decided_by_username = operator.username
+    booking.decided_by_email = operator.email
     booking.decided_by_role = operator.role
     booking.decided_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(booking)
     logger.info(
         "Request %s approved by %s (%s) -> cms %s",
-        booking.id, operator.username, operator.role, booking.cms_booking_id,
+        booking.id, operator.email, operator.role, booking.cms_booking_id,
     )
     return _to_out(booking)
 
@@ -2355,13 +2557,13 @@ async def reject(
     booking.status_cache = "rejected"
     booking.reject_reason = (reason or "").strip() or None
     booking.decided_by_cms_user_id = operator.id
-    booking.decided_by_username = operator.username
+    booking.decided_by_email = operator.email
     booking.decided_by_role = operator.role
     booking.decided_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(booking)
     logger.info(
-        "Request %s rejected by %s (%s)", booking.id, operator.username, operator.role
+        "Request %s rejected by %s (%s)", booking.id, operator.email, operator.role
     )
     return _to_out(booking)
 
@@ -2537,28 +2739,27 @@ git commit -m "feat(approvals): operator console API for deciding booking reques
 No test framework here. After every task run all three gates:
 `npx tsc --noEmit && npm run lint && npm run build`.
 
-### Task 8: Session layer — identifier and role
+### Task 8: Session layer — one shape, two principal kinds
 
 **Files:**
 - Modify: `markai-frontend-new/lib/auth.ts`
 
 **Interfaces:**
-- Produces: `AuthUser{id, role, email, username, first_name, last_name, avatar_url, google_linked, has_password}` (email/username/names now nullable); `identify(identifier)`; `login(identifier, password)`; `displayName(user)`; `isOperator(user)`; `IdentifyResult{kind, exists, has_password, google_linked, first_name}`.
+- Produces: `Role`; `AuthUser{id, role, email, first_name, last_name, avatar_url, google_linked, has_password}` (names now nullable, `email` always present); `login(email, password, asOperator?)`; `displayName(user)`; `initials(user)`; `isOperator(user)`. `identify(email)` is unchanged.
 
 - [ ] **Step 1: Update the types and calls**
 
-In `markai-frontend-new/lib/auth.ts`, replace the `AuthUser` and `IdentifyResult` interfaces (lines 18-33) with:
+In `markai-frontend-new/lib/auth.ts`, replace the `AuthUser` interface (lines 18-26) with:
 
 ```ts
 export type Role = "advertiser" | "screenowner" | "superadmin";
 
-/** The signed-in principal. One shape for advertisers and CMS operators —
- *  an advertiser has an email and a name, an operator has a username. */
+/** The signed-in principal. One shape for both kinds: an advertiser has a
+ *  name, a CMS operator has only an email and a role. */
 export interface AuthUser {
   id: string;
   role: Role;
-  email: string | null;
-  username: string | null;
+  email: string;
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
@@ -2566,23 +2767,15 @@ export interface AuthUser {
   has_password: boolean;
 }
 
-export interface IdentifyResult {
-  kind: "advertiser" | "operator";
-  exists: boolean;
-  has_password: boolean;
-  google_linked: boolean;
-  first_name: string | null;
-}
-
 /** True for a screen owner or superadmin — the people who approve bookings. */
 export function isOperator(user: AuthUser | null): boolean {
   return user?.role === "screenowner" || user?.role === "superadmin";
 }
 
-/** What to call this person in the UI: their name, or their username. */
+/** What to call this person in the UI: their name, or their email. */
 export function displayName(user: AuthUser): string {
   const full = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
-  return full || user.username || user.email || "there";
+  return full || user.email;
 }
 
 /** Up to two letters for the avatar chip. */
@@ -2590,78 +2783,90 @@ export function initials(user: AuthUser): string {
   if (user.first_name) {
     return `${user.first_name[0] ?? ""}${user.last_name?.[0] ?? ""}`.toUpperCase();
   }
-  return (user.username ?? user.email ?? "?").slice(0, 2).toUpperCase();
+  return user.email.slice(0, 2).toUpperCase();
 }
 ```
 
-Replace `identify` and `login` (lines 73-84) with:
+`IdentifyResult` is unchanged — `identify` only ever runs for advertisers.
 
-```ts
-/** An email or a CMS username — the backend decides where to look. */
-export const identify = (identifier: string) =>
-  api<IdentifyResult>("/identify", { identifier });
-
-export const login = (identifier: string, password: string) =>
-  api<AuthResult>("/login", { identifier, password });
-```
-
-Replace the `AuthResult` interface (lines 35-38) with:
+Replace `AuthResult` (lines 35-38) with:
 
 ```ts
 export interface AuthResult {
   access_token: string;
   role: Role;
   user: AuthUser | null;
-  operator: { id: string; username: string; role: Role } | null;
+  operator: { id: string; email: string; role: Role } | null;
 }
 ```
 
-- [ ] **Step 2: Verify the gates**
+Replace `login` (lines 83-84) with:
+
+```ts
+/** `asOperator` is the sign-in page's "I'm a screen owner or administrator"
+ *  checkbox: it sends the credential to the CMS instead of our own table.
+ *  One email may exist in both systems, so the person tells us which. */
+export const login = (email: string, password: string, asOperator = false) =>
+  api<AuthResult>("/login", { email, password, as_operator: asOperator });
+```
+
+- [ ] **Step 2: See what breaks**
 
 Run: `cd markai-frontend-new && npx tsc --noEmit`
-Expected: FAIL, listing the call sites that still assume the old shape — `components/layout/Navbar.tsx` (`user.first_name[0]`), `components/auth/AuthCard.tsx` (`identify(value)` result branches), `app/dashboard/page.tsx` (`user.first_name`). These are fixed in Tasks 9 and 12. Record the list; it is the work queue.
+Expected: FAIL, listing the call sites that assume the old shape — `components/layout/Navbar.tsx` (`user.first_name[0]`), `app/dashboard/page.tsx` (`user.first_name`). Those are fixed in Task 12. Record the list; it is the work queue.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 cd markai-frontend-new
 git add lib/auth.ts
-git commit -m "feat(auth): role-aware session with identifier sign-in"
+git commit -m "feat(auth): role-aware session shared by advertisers and operators"
 ```
 
 ---
 
-### Task 9: The auth card accepts a username
+### Task 9: The sign-in checkbox
 
 **Files:**
 - Modify: `markai-frontend-new/components/auth/AuthCard.tsx`
 
 **Interfaces:**
-- Consumes: `identify`, `login`, `isOperator`, `Role` (Task 8).
+- Consumes: `identify`, `login`, `Role` (Task 8).
 - Produces: post-login routing — operator → `/console`, advertiser → `/`.
 
-- [ ] **Step 1: Rename the state and branch on `kind`**
+- [ ] **Step 1: Add the checkbox state and the operator submit path**
 
-In `markai-frontend-new/components/auth/AuthCard.tsx`, replace the `email` state (line 33) with:
+In `markai-frontend-new/components/auth/AuthCard.tsx`, add beside the other state (after line 33):
 
 ```tsx
-  const [identifier, setIdentifier] = useState("");
+  const [asOperator, setAsOperator] = useState(false);
 ```
 
 Replace `onEmailContinue` (lines 62-73) with:
 
 ```tsx
-  const onIdentifierContinue = (e: FormEvent<HTMLFormElement>) => {
+  const onEmailContinue = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const value = (new FormData(e.currentTarget).get("identifier") as string).trim();
+    const data = new FormData(e.currentTarget);
+    const value = (data.get("email") as string).trim();
+
+    // Operators sign in in one step: identify can't answer for them without a
+    // password, and asking the CMS would leak which operator accounts exist.
+    if (asOperator) {
+      const password = data.get("password") as string;
+      run(async () => {
+        const res = await login(value, password, true);
+        storeSession(res.access_token);
+        router.push("/console");
+      });
+      return;
+    }
+
     run(async () => {
       const who = await identify(value);
-      setIdentifier(value);
+      setEmail(value);
       setFirstName(who.first_name ?? "");
-      // A CMS username goes straight to the password step: the backend
-      // deliberately won't say whether an operator account exists.
-      if (who.kind === "operator") setStep("password");
-      else if (!who.exists) setStep("details");
+      if (!who.exists) setStep("details");
       else if (who.has_password) setStep("password");
       else setStep("google-only");
     });
@@ -2675,62 +2880,91 @@ Replace `onLogin` (lines 75-83) with:
     e.preventDefault();
     const password = new FormData(e.currentTarget).get("password") as string;
     run(async () => {
-      const res = await login(identifier, password);
+      const res = await login(email, password);
       storeSession(res.access_token);
-      // Screen owners and admins get the approvals console; advertisers get
-      // the site they came to book on.
       router.push(res.role === "advertiser" ? "/" : "/console");
     });
   };
 ```
 
-In `onSignup` (line 95) change `email,` to `email: identifier,`. In `onSendReset` (line 108) change `forgotPassword(email)` to `forgotPassword(identifier)`.
+- [ ] **Step 2: Render the checkbox and the conditional password field**
 
-- [ ] **Step 2: Update the first field and every `email` reference in JSX**
-
-Replace the email `Field` in the `"email"` step (lines 131-141) with:
+Replace the body of the `"email"` step (lines 121-146) with:
 
 ```tsx
+            <StepPanel key="email">
+              <Heading
+                eyebrow="Mark AI account"
+                title={asOperator ? "Welcome back." : "Step into the city."}
+                sub={
+                  asOperator
+                    ? "Sign in with the email and password your administrator gave you."
+                    : "Sign in or create your account — enter your email and we'll take it from there."
+                }
+              />
+              <div className="flex flex-col gap-4">
+                {/* A CMS credential has nothing to do with Google, so the
+                    Google path disappears once the box is ticked. */}
+                {!asOperator && (
+                  <>
+                    <GoogleButton />
+                    <Divider />
+                  </>
+                )}
+                <form onSubmit={onEmailContinue} className="flex flex-col gap-4">
                   <Field
-                    id="identifier"
-                    name="identifier"
-                    type="text"
-                    label="Email or username"
-                    placeholder="you@company.com"
-                    autoComplete="username"
-                    defaultValue={identifier}
+                    id="email"
+                    name="email"
+                    type="email"
+                    label="Email"
+                    placeholder={asOperator ? "you@venue.com" : "you@company.com"}
+                    autoComplete="email"
+                    defaultValue={email}
                     required
                     autoFocus
                   />
+                  {asOperator && (
+                    <Field
+                      id="operator_password"
+                      name="password"
+                      type="password"
+                      label="Password"
+                      autoComplete="current-password"
+                      required
+                    />
+                  )}
+                  <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-snug text-muted">
+                    <input
+                      type="checkbox"
+                      checked={asOperator}
+                      onChange={(e) => {
+                        setAsOperator(e.target.checked);
+                        setError("");
+                      }}
+                      className="mt-0.5 h-4 w-4 flex-none accent-[var(--blue)]"
+                    />
+                    I&rsquo;m a screen owner or administrator
+                  </label>
+                  <ErrorNote>{error}</ErrorNote>
+                  <SubmitButton busy={busy}>
+                    {asOperator ? "Sign in" : "Continue"}
+                  </SubmitButton>
+                </form>
+              </div>
+            </StepPanel>
 ```
-
-Change the step's copy (lines 123-126) to:
-
-```tsx
-                eyebrow="Mark AI account"
-                title="Step into the city."
-                sub="Advertisers, sign in with your email. Screen owners, use the username your administrator gave you."
-```
-
-Replace every remaining `email={email}` on `<BackRow />` with `email={identifier}`, and the `reset-sent` sub (line 265) with:
-
-```tsx
-                sub={`We emailed ${identifier} a link to set your password. It expires in 30 minutes — check spam if it hides.`}
-```
-
-Rename `onEmailContinue` at its usage site (line 130) to `onIdentifierContinue`.
 
 - [ ] **Step 3: Verify**
 
-Run: `cd markai-frontend-new && npx tsc --noEmit`
-Expected: the AuthCard errors are gone; Navbar and dashboard errors remain (Task 12).
+Run: `cd markai-frontend-new && npx tsc --noEmit && npm run lint`
+Expected: the AuthCard reports no errors; Navbar and dashboard errors from Task 8 remain until Task 12.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 cd markai-frontend-new
 git add components/auth/AuthCard.tsx
-git commit -m "feat(auth): sign in with a CMS username, route operators to the console"
+git commit -m "feat(auth): screen owner and administrator sign-in checkbox"
 ```
 
 ---
@@ -2784,7 +3018,7 @@ export interface ApprovalRequest {
   target_plays_per_day: number | null;
   approval_status: "pending" | "approved" | "rejected";
   cms_booking_id: string | null;
-  decided_by_username: string | null;
+  decided_by_email: string | null;
   decided_by_role: string | null;
   decided_at: string | null;
   reject_reason: string | null;
@@ -3730,7 +3964,7 @@ export default function ApprovalHistoryPage() {
                     {r.advertiser_name ?? r.advertiser_email ?? "—"}
                   </td>
                   <td className="border-t border-edge px-5 py-4 text-muted">
-                    {r.decided_by_username ?? "—"}
+                    {r.decided_by_email ?? "—"}
                   </td>
                   <td className="border-t border-edge px-5 py-4 text-muted">
                     {decidedLabel(r.decided_at)}
@@ -3831,7 +4065,7 @@ and replace line 312 with:
   const chars = initials(user);
 ```
 
-then replace the `{initials}` usage at line 332 with `{chars}`. Replace the two places that render `{user.first_name} {user.last_name}` (lines 253 and 428) with `{displayName(user)}`, and the two `{user.email}` lines beneath them (255, 430) with `{user.email ?? user.username}`.
+then replace the `{initials}` usage at line 332 with `{chars}`. Replace the two places that render `{user.first_name} {user.last_name}` (lines 253 and 428) with `{displayName(user)}`. The `{user.email}` lines beneath them (255, 430) need no change — `email` is now always present on `AuthUser`.
 
 - [ ] **Step 4: Fix the advertiser dashboard greeting**
 
@@ -4092,11 +4326,11 @@ cd ../markai-frontend-new && npm run dev         # platform :3100
 
 - [ ] **Step 2: Create the operator in the CMS**
 
-In the CMS at http://localhost:5120/login, sign in as `superadmin` / `Admin@123`. Under **Users**, create a screenowner `bs` with password `Owner@123`, assigned to one screen (register a screen first if the fleet is empty). Note the screen's name.
+In the CMS at http://localhost:5120/login, sign in as `admin@mark-ai.tech` / `Admin@123` (the seeded superadmin — note this replaces the old `superadmin` username login). Under **Users**, create a screenowner `bs@cafe.com` with password `Owner@123`, assigned to one screen (register a screen first if the fleet is empty). Note the screen's name.
 
 - [ ] **Step 3: Raise a request as an advertiser**
 
-At http://localhost:3100/auth, sign in with an email account, upload a creative and book the screen you assigned to `bs`.
+At http://localhost:3100/auth, sign in with an advertiser email — checkbox left **unticked** — then upload a creative and book the screen you assigned to `bs@cafe.com`.
 
 Confirm the campaign shows **Awaiting approval** at http://localhost:3100/dashboard/campaigns.
 
@@ -4104,7 +4338,7 @@ Confirm the CMS bookings page shows **nothing new** — this is the core guarant
 
 - [ ] **Step 4: Approve as the screen owner**
 
-Sign out. At http://localhost:3100/auth enter `bs` (no `@`) and `Owner@123`. Confirm you land on `/console`, the Approvals badge shows 1, and the request card shows the real creative, the advertiser's name and the schedule.
+Sign out. At http://localhost:3100/auth **tick "I'm a screen owner or administrator"**, then enter `bs@cafe.com` / `Owner@123`. Confirm the Google button disappears when the box is ticked, that you land on `/console`, that the Approvals badge shows 1, and that the request card shows the real creative, the advertiser's name and the schedule.
 
 Approve it. Confirm:
 - the campaign now appears in the CMS bookings list,
@@ -4113,15 +4347,17 @@ Approve it. Confirm:
 
 - [ ] **Step 5: Verify a rejection leaves the CMS clean**
 
-Raise a second request, decline it as `bs` with a reason, and confirm the CMS shows no new booking and the advertiser sees **Declined** with the reason.
+Raise a second request, decline it as `bs@cafe.com` with a reason, and confirm the CMS shows no new booking and the advertiser sees **Declined** with the reason.
 
 - [ ] **Step 6: Verify the superadmin's unfiltered queue**
 
-Sign in at :3100 as `superadmin` / `Admin@123`. Confirm the queue shows requests for screens `bs` does not own — including any screen with no owner at all.
+Sign in at :3100 with the box ticked as `admin@mark-ai.tech` / `Admin@123`. Confirm the queue shows requests for screens `bs@cafe.com` does not own — including any screen with no owner at all.
 
-- [ ] **Step 7: Confirm the role separation**
+- [ ] **Step 7: Confirm the role separation and the shared-email case**
 
-While signed in as `bs`, navigate to http://localhost:3100/screens and http://localhost:3100/dashboard. Confirm both redirect to `/console`.
+While signed in as `bs@cafe.com`, navigate to http://localhost:3100/screens and http://localhost:3100/dashboard. Confirm both redirect to `/console`.
+
+Then sign up an **advertiser** account using the same address `bs@cafe.com` with a different password. Confirm that with the box unticked it signs in as the advertiser, and with the box ticked as the screen owner — one email, two accounts, the checkbox choosing between them. This is the case that motivated the checkbox, so it must be exercised.
 
 - [ ] **Step 8: Run every gate one final time**
 
@@ -4138,19 +4374,22 @@ Expected: all green. Do not proceed past a failure — report it instead.
 Push each repo and open a PR to `main` describing the whole change. Do **not** add a Claude co-author trailer to any commit.
 
 ```bash
-cd markai-signage-api && git push -u origin feature/booking-approval
+cd markai-signage-api  && git push -u origin feature/booking-approval
+cd ../markai-Web-cms    && git push -u origin feature/booking-approval
 cd ../markai-backend-new && git push -u origin feature/booking-approval
 cd ../markai-frontend-new && git push -u origin feature/booking-approval
 ```
 
-Open one PR per repo with `gh pr create --base main`. Each description must state: what the gate does, that the CMS is never called until approval, that CMS-originated bookings are unaffected, and that the change is for newly created screenowners/superadmins only (production data is wiped before launch). Cross-link the three PRs, and note that `markai-signage-api` must merge and deploy first — the other two depend on its two new ext endpoints.
+Open one PR per repo with `gh pr create --base main`. Each description must state: what the gate does, that the CMS is never called until approval, that CMS-originated bookings are unaffected, and that the change targets newly created operators only (production data is wiped before launch). Call out prominently that **the CMS sign-in credential changes from the `superadmin` username to `admin@mark-ai.tech`**, since that is the one change a reader must not discover by being locked out.
+
+Cross-link the four PRs and state the merge order, which is not optional: `markai-signage-api` first (it owns the `username` → `email` migration and the two new ext endpoints), then `markai-Web-cms` (its login breaks until that migration lands), then `markai-backend-new`, then `markai-frontend-new`.
 
 ---
 
 ## Self-Review
 
-**Spec coverage.** Every numbered decision in the spec maps to a task: approvals-on-platform-only (Tasks 10-12), either approver (Task 7 `_scoped`/`may_decide`), unfiltered superadmin queue including ownerless screens (Task 7, tested), CMS bookings stay instant (nothing in Phase A touches `/api/cms/bookings`), no expiry (no sweep job anywhere), no notifications (badge only, Task 10), approvals-only console (Task 4's `get_current_user` rejection + Task 12 Step 7), new users only (no backfill; migration marks pre-existing rows `approved`). Both ext endpoints, the migration, the identifier routing rule, the operating-hours move, the row-lock ordering, and all four console pages have tasks.
+**Spec coverage.** Every numbered decision in the spec maps to a task: approvals-on-platform-only (Tasks 10-12), either approver (Task 7 `_scoped`/`may_decide`), unfiltered superadmin queue including ownerless screens (Task 7, tested), CMS bookings stay instant (nothing in Phase A or 0 touches `/api/cms/bookings`), no expiry (no sweep job anywhere), no notifications (badge only, Task 10), approvals-only console (Task 4's `get_current_user` rejection + Task 12 Step 7), new users only (no backfill; migration 0004 marks pre-existing rows `approved` and migration 0032 is a bare rename), operators identified by email (Tasks A and B), and the checkbox choosing the auth system (Tasks 5 and 9). Both ext endpoints, both migrations, the operating-hours move, the row-lock ordering, and all four console pages have tasks.
 
 **Known gap accepted:** the frontend has no automated test coverage because the repo has no test framework and adding one is out of scope; Task 13's manual walkthrough is the substitute, and it exercises every path the tests would.
 
-**Type consistency.** `ExtOperator` (Task 1) is consumed unchanged by Task 2 and mapped in Task 4's `verify_operator`/`get_operator_scope`. `Operator{id, username, role}` is used identically in Tasks 4, 5 and 7. `approval_status` values `pending`/`approved`/`rejected` are the same strings in the model (Task 3), the service (Task 7), the router's regex (Task 7), and the frontend types (Tasks 10, 12). `to_out`'s derived `status` values `pending_approval`/`rejected` (Task 3) match the `Booking["status"]` union and the `StatusBadge` keys (Task 12). `displayName`/`initials`/`isOperator` are defined once in Task 8 and consumed in Tasks 9, 10 and 12.
+**Type consistency.** `cms_users.email` (Task A) is the identifier in Task B's forms, Task 1's `ExtVerifyRequest`, and Task 5's `login_operator`. `ExtOperator{id, email, role, screen_ids, is_active}` (Task 1) is consumed unchanged by Task 2 and mapped in Task 4's `verify_operator`/`get_operator_scope`. `Operator{id, email, role}` is used identically in Tasks 4, 5 and 7, and `decided_by_email` is the column name in Tasks 3, 7 and 11. `approval_status` values `pending`/`approved`/`rejected` are the same strings in the model (Task 3), the service (Task 7), the router's regex (Task 7), and the frontend types (Tasks 10, 12). `to_out`'s derived `status` values `pending_approval`/`rejected` (Task 3) match the `Booking["status"]` union and the `StatusBadge` keys (Task 12). `displayName`/`initials`/`isOperator` are defined once in Task 8 and consumed in Tasks 9, 10 and 12.
