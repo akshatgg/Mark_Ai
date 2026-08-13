@@ -1,0 +1,23 @@
+[Unit]
+Description=Mark AI player APK updater agent
+# tailscaled must be up first: every job reaches its screen over the tailnet, and
+# starting before it means the first poll cycle fails on every claimed job.
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=MARKAI_API_BASE=https://cms-api.mark-ai.tech
+Environment=MARKAI_BUCKET=markai-storage
+Environment=MARKAI_CACHE_DIR=/var/lib/markai-agent/apk
+Environment=MARKAI_POLL_SECONDS=20
+# Holds MARKAI_AGENT_SECRET only. Mode 600, never in the repo.
+EnvironmentFile=/etc/markai-agent.env
+ExecStart=/usr/bin/python3 /opt/markai-agent/agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

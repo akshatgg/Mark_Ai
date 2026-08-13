@@ -27,3 +27,7 @@ mesa-startup-lab-*.json
 
 # Local dev reset helper (not for the repo)
 reset-dev.sh
+.superpowers/
+
+# Upstream Headscale clone — evaluation only, not our code (427MB)
+headscale/

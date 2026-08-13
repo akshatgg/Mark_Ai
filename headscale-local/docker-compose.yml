@@ -1,0 +1,34 @@
+# Local Headscale for evaluation — NOT a production deployment.
+#
+# Production notes (from the code review of v0.29.3), so nobody copies this to a server:
+#   - Headscale cannot run on Cloud Run: scale-to-zero regenerates
+#     /var/lib/headscale/noise_private.key, which changes the control-plane
+#     identity and invalidates every enrolled device.
+#   - It cannot run multi-replica: IPAllocator holds used IPs behind a local
+#     mutex, so two replicas hand out overlapping tailnet addresses.
+#   - Supported shape is one VM, systemd, local disk, public IP.
+#
+# Run:   docker compose up -d
+# Logs:  docker compose logs -f
+# CLI:   docker compose exec headscale headscale <command>
+# Stop:  docker compose down
+
+services:
+  headscale:
+    image: headscale/headscale:0.29.3
+    container_name: headscale-local
+    restart: unless-stopped
+    command: serve
+    ports:
+      - "8100:8080"   # control plane — the Tailscale clients talk here
+      - "9100:9090"   # metrics / debug
+    volumes:
+      - ./config:/etc/headscale
+      - ./data:/var/lib/headscale
+      # NOT a bind mount: headscale chmods its gRPC socket at startup, and
+      # chmod on a macOS bind mount returns EINVAL, so the server crash-loops.
+      # A named volume is a real Linux filesystem inside the VM, so chmod works.
+      - headscale-run:/var/run/headscale
+
+volumes:
+  headscale-run:
