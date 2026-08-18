@@ -30,8 +30,11 @@ from typing import List, Optional
 
 import requests
 
-API_BASE = os.environ["MARKAI_API_BASE"].rstrip("/")
-AGENT_SECRET = os.environ["MARKAI_AGENT_SECRET"]
+# Read with .get, not [] — a module that raises KeyError at import time cannot be
+# imported by its own tests, and the failure surfaces as a collection error rather
+# than the clear "you forgot the env file" message main() gives.
+API_BASE = os.environ.get("MARKAI_API_BASE", "").rstrip("/")
+AGENT_SECRET = os.environ.get("MARKAI_AGENT_SECRET", "")
 BUCKET = os.environ.get("MARKAI_BUCKET", "markai-storage")
 POLL_SECONDS = int(os.environ.get("MARKAI_POLL_SECONDS", "20"))
 CACHE_DIR = os.environ.get("MARKAI_CACHE_DIR", "/var/lib/markai-agent/apk")
@@ -184,6 +187,20 @@ def process(job: dict) -> None:
 
 
 def main() -> None:
+    missing = [
+        name
+        for name, value in (
+            ("MARKAI_API_BASE", API_BASE),
+            ("MARKAI_AGENT_SECRET", AGENT_SECRET),
+        )
+        if not value
+    ]
+    if missing:
+        raise SystemExit(
+            f"missing required environment: {', '.join(missing)} "
+            "(set them in /etc/markai-agent.env)"
+        )
+
     log.info(
         "markai updater agent starting; api=%s bucket=%s poll=%ss",
         API_BASE,

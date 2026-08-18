@@ -1,0 +1,66 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Helvetica, Arial, sans-serif","fontSize":"16px","primaryTextColor":"#0B1420","lineColor":"#8296AA","clusterBkg":"#F7FAFC","clusterBorder":"#C7D4E1"},"flowchart":{"htmlLabels":false,"wrappingWidth":900,"curve":"basis","nodeSpacing":40,"rankSpacing":75,"padding":18}}}%%
+flowchart LR
+
+classDef client fill:#E7EEFE,stroke:#1D4ED8,stroke-width:1.4px,color:#153A9E
+classDef app    fill:#E2F2E8,stroke:#15803D,stroke-width:1.4px,color:#0C5028
+classDef data   fill:#FAEFDC,stroke:#96590A,stroke-width:1.4px,color:#6A3E05
+classDef ext    fill:#F1E9FA,stroke:#6D28D9,stroke-width:1.4px,color:#4C1D95
+classDef wire   fill:#EEF2F6,stroke:#44576B,stroke-width:1.4px,color:#26323F
+
+subgraph CL["1 · CLIENT LAYER"]
+  CMS["WEB CMS  ·  operators<br/>Next.js 15 App Router · React 19 · TypeScript 5<br/>Tailwind CSS v4 · lucide-react · framer-motion<br/>Vitest · deployed on Cloud Run"]
+  APK["PLAYER APK  ·  the screens<br/>Kotlin 2.0 · Gradle KTS · minSdk 24 / target 34<br/>Media3 ExoPlayer (video) · Coil (images)<br/>Retrofit + OkHttp + kotlinx.serialization<br/>WorkManager (uploads) · DataStore (cache)<br/>Android Keystore — ECDSA P-256 signing"]
+  PRT["PARTNER PLATFORM<br/>third-party reseller · any HTTP client"]
+end
+
+subgraph AP["2 · APPLICATION LAYER  —  Google Cloud Run (autoscaled, stateless)"]
+  API["FastAPI 0.115 · Uvicorn · Python 3.12 · Poetry<br/>Pydantic v2 + pydantic-settings<br/>PyJWT HS256 · pbkdf2_sha256 (stdlib) · cryptography (ECDSA verify)<br/>Pillow · openpyxl · aiosmtplib<br/>CI: Cloud Build on push to main → Artifact Registry"]
+
+  subgraph DOM["Domain services  (router / schemas / service / models per package)"]
+  direction LR
+    D1["screens<br/>bookings · loops"]
+    D2["playback<br/>screenshots"]
+    D3["cms_users<br/>api_keys"]
+    D4["ai<br/>agent · tools · guardrails"]
+  end
+  API --> DOM
+end
+
+CMS -->|"/api/cms/*   ·   CMS JWT (HS256)"| API
+subgraph WIRE["SCREEN ↔ API CONTRACT  —  REST only"]
+  HB["HEARTBEAT  ·  every 60 s<br/>POST /api/playback/heartbeat<br/>up: alive · now playing · schedule version<br/>down: reload flag + due screenshot jobs"]
+  PP["PROOF OF PLAY  ·  separate channel<br/>POST /api/playback/proof<br/>BATCHED — up to 200 signed plays per request<br/>own WorkManager worker, ~1 upload / 60 s<br/>offline → queued on disk, uploaded later"]
+  NW["NO WEBSOCKET<br/>nothing held open, so Cloud Run stays stateless<br/>and scales to any fleet size<br/>cost: an edit lands within one heartbeat"]
+end
+
+APK -->|"screen JWT"| WIRE
+WIRE --> API
+PRT -->|"/api/ext/*   ·   X-Api-Key-Id + X-Api-Secret"| API
+
+subgraph DL["3 · DATA LAYER"]
+  PG["PostgreSQL  —  Google Cloud SQL<br/>SQLAlchemy 2.0 async + asyncpg (runtime)<br/>Alembic + psycopg2 (migrations)<br/>SOURCE OF TRUTH — 19 tables"]
+  RD["Redis 5<br/>AI stream pub/sub<br/>per-session turn locks<br/>degrades in-process if down"]
+  GCS["Google Cloud Storage<br/>bucket: markai-storage<br/>ad creatives (direct resumable upload)<br/>+ milestone screenshots (kept forever)"]
+  CDN["Cloudinary<br/>per-play + on-demand screenshots<br/>(pruned with the campaign)"]
+end
+
+DOM --> PG
+DOM --> RD
+DOM --> GCS
+DOM --> CDN
+
+subgraph EX["4 · EXTERNAL SERVICES"]
+  GEM["Google Gemini 2.5 Flash<br/>via pydantic-ai-slim[google]<br/>agent + tools + scope guardrail"]
+  CRN["cron-job.org<br/>3 scheduled jobs → /api/cron/*<br/>screenshot sweep · cleanup · telemetry rollup<br/>auth: X-Cron-Secret"]
+  GML["Gmail API (OAuth)<br/>operator mail"]
+end
+
+D4 --> GEM
+CRN --> API
+DOM --> GML
+
+class CMS,APK,PRT client
+class API,D1,D2,D3,D4 app
+class PG,RD,GCS,CDN data
+class GEM,CRN,GML ext
+class HB,PP,NW wire

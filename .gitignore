@@ -31,3 +31,12 @@ reset-dev.sh
 
 # Upstream Headscale clone — evaluation only, not our code (427MB)
 headscale/
+
+# Sub-projects with their own git repos — never track them from the root
+gcp-env/
+markai-3d-studio/
+markai-ar-mvp/
+markai-backend-new/
+markai-frontend-new/
+markai-creative-fit/
+markai-creative-fit-web/

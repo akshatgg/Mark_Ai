@@ -1,0 +1,64 @@
+[tool.poetry]
+name = "markai-creative-fit"
+version = "0.1.0"
+description = "Mark AI — creative auto-fit. Deconstructs a finished ad creative and rebuilds it for any screen resolution."
+authors = ["Mark AI <dev@markai.example>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+# Verified end-to-end (CLI + every endpoint) at BOTH ends of these ranges:
+#   google-genai 1.75.0 / 2.16.0 · fastapi 0.115.14 / 0.141.1 · pillow 11.3 / 12.3
+# Widened deliberately — a caret on google-genai would have locked out the 2.x
+# line that this was originally built against.
+python = "^3.12"
+fastapi = ">=0.115.0,<1.0.0"
+uvicorn = {extras = ["standard"], version = ">=0.32.0,<1.0.0"}
+pydantic = "^2.10.0"
+pydantic-settings = "^2.7.0"
+python-dotenv = "^1.0.1"
+python-multipart = ">=0.0.32,<1.0.0"
+pillow = ">=11.0.0,<13.0.0"
+google-genai = ">=1.75.0,<3.0.0"
+httpx = ">=0.28.0,<1.0.0"
+# LaMa is a TorchScript checkpoint we load directly (see app/plate/lama.py).
+# We deliberately do NOT depend on `simple-lama-inpainting`: it declares
+# numpy<2 / pillow<10, which Poetry enforces even though the model runs fine
+# past both. Vendoring the ~40-line runner keeps this service on current pins.
+torch = "^2.5.0"
+numpy = "^2.1.0"
+# u2net (logo cutout) runs through onnxruntime rather than the `rembg` package,
+# which drags in scikit-image + numba and pins numpy back down.
+onnxruntime = "^1.20.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+isort = "^5.13.0"
+ruff = "^0.8.0"
+mypy = "^1.13.0"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+# B008  — FastAPI's Depends()/File()/Form() defaults are the documented idiom.
+# UP042 — Role stays `(str, Enum)` rather than StrEnum: it is serialised into the
+#         Gemini response_schema, and the plain-str base is what round-trips.
+ignore = ["B008", "UP042"]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+explicit_package_bases = true
+mypy_path = "."
+ignore_missing_imports = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

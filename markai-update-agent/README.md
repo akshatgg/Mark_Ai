@@ -46,24 +46,38 @@ and the box needs a second visit.
 
 1. **Put the fleet adb key on your laptop first** — see "The adb key" below.
    Do this *before* you leave.
-2. Install the **release** APK (never a debug build — it has a different
-   `applicationId` and signing key, so a debug install can never be updated into
-   the release app).
-3. Enable **USB debugging**, plug in, tap **Allow** when the box prompts.
-4. `adb tcpip 5555`
-5. Install Tailscale, and join it to the control server:
-   - **Settings → Accounts → ⋮ → "Use an alternate server"**
-   - `https://headscale.mark-ai.tech`
-   - Use an auth key: `./hs key` from `headscale-local/` (copy it at creation —
-     `preauthkeys list` masks it and never shows it again)
-6. Tap **Allow** on Android's "Tailscale wants to set up a VPN connection".
-7. **Settings → Network & Internet → VPN → Tailscale → Always-on VPN → ON.**
-   Without this the box does not rejoin the network after a power cut.
-   ⚠️ Leave **"Block connections without VPN" OFF.** With it on, a Tailscale
-   failure blocks *all* traffic — no heartbeat, no ads, no way back in.
-8. Record the box's Tailscale IP into the CMS screen page (`./hs ips`).
-9. **Reboot the box and confirm it is still reachable.** This is the step people
-   skip and regret; see the first known limitation below.
+2. **Install Tailscale first, and join it**, before the player:
+   - **Settings → Accounts → ⋮ → "Use an alternate server"** →
+     `https://headscale.mark-ai.tech/` (keep the trailing slash — without it the
+     TV keyboard autocorrects `.tech` to `.technology`)
+   - Then **⋮ → "Use an auth key"** with a reusable tagged key (`./hs key` from
+     `headscale-local/`; copy it at creation, `preauthkeys list` masks it forever)
+   - Turn the **Connect to VPN** toggle ON and tap **Allow** on Android's VPN
+     prompt. Until that is tapped there is no `tun0`, and the box answers pings
+     while refusing every TCP connection — which looks like a firewall problem
+     and is not one.
+   - **Always-on VPN** ON. ⚠️ Leave **"Block connections without VPN" OFF**: with
+     it on, a VPN failure blocks *all* traffic — no heartbeat, no ads, no way in.
+
+   Tailscale first is deliberate. The player reads its own fleet address when it
+   registers, so if the tunnel is already up the CMS is populated in one step
+   instead of waiting for the next heartbeat.
+3. Install the **release** APK (never a debug build — different `applicationId`
+   and signing key, so a debug install can never be updated into the release app).
+   Sideload it from a pendrive, or let the box download it in its own browser.
+4. Enable **USB debugging** in Developer options (Settings → About → tap
+   **Android TV OS build** 7×). Note there is no "wireless debugging" toggle on
+   these ROMs — adb listens once USB debugging is on.
+5. Make adb survive power cuts (needs root, which these boxes have):
+   `adb root && adb shell setprop persist.adb.tcp.port 5555`
+6. **Reboot the box and confirm it is still reachable.** This is the step people
+   skip and regret.
+7. Confirm the CMS filled in the screen's address by itself. It should need no
+   typing; the manual field is an override for boxes on an older player build.
+
+⚠️ **These boxes have no USB port that can talk to a laptop.** Both USB ports are
+host-only — a connected Mac charges but never enumerates, whatever cable or USB
+mode you choose. Everything is done over the network.
 
 ## The adb key
 

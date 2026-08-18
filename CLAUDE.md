@@ -109,12 +109,18 @@ The CMS uses `/api/cms/*` (JWT login). External partners use `/api/ext/*` (API-k
   windowless booking inherits the screen's hours). A quiet screen outside hours reads
   `off_hours` (calm), not `offline`. We do NOT power the panel off — the venue/hardware
   does that.
-- **The loop timing is OWNER-fixed, not client-set (important):** each screen has two
-  owner/superadmin fields — `slot_duration_seconds` (how long EVERY ad plays) and
-  `loop_duration_seconds` (when the loop restarts). Number of slots = loop ÷ slot. A client
-  booking can NOT set play duration; every ad (image *and* video) plays for the screen's slot
-  duration and repeats once per loop. (Earlier `min_display_seconds` on bookings was wrong and
-  is now ignored.)
+- **The loop is a GRID OF SLOTS, each with its own length (migration `0042`):** a screen
+  owns a contiguous list of slots (`screen_slots`) and **every slot can be a different
+  length**. A new screen gets **9 slots × 10s = a 90-second loop**; the loop length is
+  always the SUM of the slots, so stretching slot 2 from 10s to 15s makes the loop 95s on
+  its own — there is no separate loop number to keep in step. A screenowner (or superadmin)
+  edits any slot from the CMS screen page, including a slot an advertiser's campaign is
+  sitting in.
+  **The timing is still OWNER-controlled, never client-set:** an ad *occupies* a slot, and
+  the SLOT owns the seconds. A booking cannot ask for its own duration. (`min_display_seconds`
+  on bookings remains dead and ignored.) `screens.slot_duration_seconds` now means "the
+  default length for a new slot"; `loop_duration_seconds` and `slot_count` are mirrors of
+  the grid. An oversold screen grows its grid rather than rejecting a booking.
 - **Roles, no signup:** **superadmin / screenowner** (the old admin/user roles were removed).
   - superadmin: full control; creates more superadmins and screenowners; assigns which
     screens each screenowner may manage; books campaigns; manages API keys. Seeded on startup.
