@@ -606,3 +606,15 @@ Both patterns must be copied or the tests fail only on CI.
 4. **Cloud Run flags live in `cloudbuild.yaml`, not `gcp-env/`** (§5). A future change to
    `--no-cpu-throttling` or `--min-instances` belongs there.
 5. **JSONB must be written by whole-object reassignment** — applies to `media_ref` (§6).
+
+## 18. Message layout (the "slip")
+
+Proposals and results are laid out one fact per line, never as a paragraph:
+heading (`📋 *New booking*` / `✅ *Booked*`), then `*Label:* value` lines, an
+`ℹ️` line per plain note, an `⚠️ *Heads-up*` block with one bullet per warning,
+and a one-line footer telling the operator what the buttons do. Several
+proposals share a header (count + the facts common to all) and a numbered list
+of what differs, with ⚠️ tags. Rendering is `app/whatsapp/slip.py` (pure);
+the data is the optional `detail` a tool attaches via `_propose(...)`. Cards
+without `detail` fall back to the flat `summary`. Interactive bodies over 1024
+chars go out as text + a one-line buttons message.

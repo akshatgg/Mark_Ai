@@ -225,9 +225,17 @@ From `markai-creative-fit/app/video/` into `markai-signage-api/app/video/`:
 `blueprint.py`, no reframe, no compose, no numpy, no tracking.
 
 One ffmpeg pass: `scale=w:h`, explicit BT.709 conversion **and** tagging (tagging
-alone produces a 601-encoded file labelled 709), CFR, source fps capped, audio
-stripped. New settings: `VIDEO_MAX_FPS` and the x264 quality keys `encode.py`
-reads. No quality tiers are exposed to any user.
+alone produces a 601-encoded file labelled 709), CFR, audio stripped. No quality
+tiers are exposed to any user.
+
+**One thing the design missed, found while building.** The 30fps / level-5.1
+ceiling is the AndBox Prime X4's *hardware* limit — the S905X4 decodes 4K30 and
+not 4K60. Applying it to Studio would silently halve a user's frame rate to suit
+a decoder their file will never touch, which is exactly the downscaling the
+quality rule forbids. So the ceiling is a parameter, not a constant: creatives
+bound for a Mark AI panel keep `VIDEO_MAX_FPS`/`VIDEO_MAX_LEVEL`, and Studio
+passes `STUDIO_VIDEO_MAX_FPS`/`STUDIO_VIDEO_MAX_LEVEL` (60 / 5.2 — what H.264
+High can express at 4K).
 
 ### Worker changes
 
@@ -276,12 +284,14 @@ GET  /api/ext/creative-fit/jobs                this account's history
 GET  /api/ext/creative-fit/jobs/{id}           poll
 POST /api/ext/creative-fit/jobs/{id}/refine
 POST /api/ext/creative-fit/jobs/{id}/cancel
-GET  /api/ext/creative-fit/jobs/{id}/download  signed URL for the result
 ```
 
+**Changed during implementation, deliberately:** the separate
+`/download` route was dropped. `result_url` on every job response is already a
+time-limited signed URL, so a second endpoint would have been a redirect to a
+value the caller already held.
+
 No `/targets` and no `/save` — Studio has no screens and no Content library.
-`/download` is new and necessary: a public user has no CMS session and cannot
-read a GCS URL directly.
 
 **Identity.** The API key proves the caller is the Studio server; an
 `X-Studio-User: <google sub>` header names which end user, and the route upserts
