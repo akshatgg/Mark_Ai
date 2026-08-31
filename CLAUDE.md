@@ -54,9 +54,13 @@ The new signage system is `markai-signage-api` + `markai-player-apk` + `markai-W
 ## How to run the new system locally
 1. **Backend** (needs Docker + Poetry):
    ```bash
-   cd markai-signage-api && cp .env.example .env && ./dev_start.sh   # Postgres :5433, API :8000
+   cd markai-signage-api && cp .env.example .env && ./dev_start.sh   # Postgres :5433, API :8095
    ```
-   Postgres host port is **5433** (5432 is taken on this machine).
+   Postgres host port is **5433** (5432 is taken on this machine), and the API
+   binds **8095** — `dev_start.sh` says so, `markai-Web-cms` and
+   `markai-studio-web` both point there, and the APK's `BASE_URL` uses it. This
+   line read `:8000` until 2026-08-31; a service pointed at 8000 fails with a
+   bare connection error that looks like a bug in the caller.
 2. **CMS**:
    ```bash
    cd markai-Web-cms && npm install && npm run dev                   # :5120
