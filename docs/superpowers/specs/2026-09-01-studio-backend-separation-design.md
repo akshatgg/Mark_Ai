@@ -69,6 +69,9 @@ runtime.
 | The AI agent | Ported verbatim | Explicit instruction: same agent, same tools as the CMS. `agent.py`, `prompts.py`, `gemini_image.py`, `analysis.py`, `resizer.py` copy across unchanged. |
 | Studio user data | A real `studio_users` table in the new DB | Confirmed by the user: "if you are making a table, you can also store user data, just like you are putting things in a CMS." Budgets and `is_blocked` therefore keep working. |
 | Browser-local history | Not built | Considered and dropped once Studio kept a database. `GET /jobs` already answers it, and IndexedDB would be a second copy of the truth. |
+| Container sizing | **1 CPU / 1 Gi** | User's call. Achievable only with the streaming rewrite below — the current code cannot do it at any input size. |
+| Input caps | **10 MB image, 100 MB video** | User's call. 100 MB keeps real 1080p ads in scope; 10 MB would have excluded most of them. |
+| Stopping a job | Must work while it is *running*, not just queued | User's call. Today a running video encode ignores a cancel — see *Stopping a running job*. |
 | Public API path | Unchanged: `/api/ext/creative-fit/*` | The BFF builds its target as `${BACKEND}/api/ext/creative-fit/${path}`. Keep the path and the frontend change is one environment variable. |
 | Which agent | The Creative Fit analyst, **not** the chat co-pilot | "The same agent as the CMS" is ambiguous — see below. |
 | Engine code | Copied, not extracted into a shared package | A shared library would re-couple the two services at the version level — the thing we are removing. The duplication is ~1,400 lines of pure functions with no CMS imports, and the two copies are free to diverge (Studio already runs a higher video ceiling). |
@@ -323,15 +326,227 @@ account `studio-api-runtime@`, new Cloud Build trigger.
 
 | Setting | Value | Why |
 |---|---|---|
-| CPU / memory | **2 CPU / 4 Gi** | The actual OOM fix. ffmpeg no longer shares 1 GiB with an API. |
+| CPU / memory | **1 CPU / 1 Gi** | Deliberate. The OOM is fixed by not holding media in memory, not by buying headroom — see *Running in 1 GiB*. |
 | min-instances | 0 | Public traffic is bursty and nothing here is long-lived. |
 | max-instances | 3 | Pool of 30 connections per instance against a small Cloud SQL tier. |
 | CPU throttling | off | The worker pool runs between requests. |
 | Ingress | `--no-invoker-iam-check` | Org policy blocks `allUsers`; same workaround as every other service. |
 | Secrets | `DATABASE_URL`, `GEMINI_API_KEY`, `STUDIO_EXT_API_SECRET`, `STUDIO_UNLIMITED_EMAILS` | |
 
-Once cut over, `cms-back` should be watched for a revision or two and can then
-keep its 1 GiB — the load that justified raising it has left the container.
+Once cut over, `cms-back` keeps its 1 GiB — the load that would have justified
+raising it has left the container.
+
+`--execution-environment=gen2` is required: gen1 has a smaller `/tmp` and a
+different network stack, and the ffmpeg-over-HTTPS input below depends on
+range requests working properly.
+
+## Running in 1 GiB
+
+The container is 1 CPU / 1 Gi and the input caps are 10 MB for an image and
+100 MB for a video. Those numbers are only compatible because the media never
+sits in memory. Today it sits there four times.
+
+### The fact that governs everything here
+
+**On Cloud Run, `/tmp` is a tmpfs — it is RAM.** A temp file is not scratch
+space, it is memory that counts against the 1 Gi allocation. Every design
+choice below follows from that one sentence, and it is the reason the current
+code cannot be made to fit by tuning alone.
+
+### What the current path costs
+
+`_execute_video_job` holds a 100 MB source four times over:
+
+```python
+data = await _download(url)          # 100 MB  → bytes in RAM
+src.write_bytes(source_bytes)        # 100 MB  → /tmp, which is also RAM
+... ffmpeg ...                       #          + working set
+return out.read_bytes(), variant     # output  → back into RAM
+await _upload(data, ...)             #          still in RAM
+```
+
+Peak is comfortably over 500 MB before ffmpeg allocates a single frame buffer.
+Two concurrent jobs is the observed 1034 MiB kill.
+
+### The rewrite
+
+Four changes, and none of them is a tuning knob:
+
+1. **The source never lands locally.** ffmpeg is given a short-lived signed GCS
+   URL as its input (`ffmpeg -i "https://..."`) and reads it over HTTPS range
+   requests. `_download()` disappears from the video path entirely — the
+   100 MB is never a `bytes` and never a temp file. (An MP4 with its `moov`
+   atom at the end costs extra round trips as ffmpeg seeks; that is latency,
+   not memory.)
+2. **The result streams straight out.** ffmpeg writes to `/tmp`, and the file
+   is handed to `blob.upload_from_file()` and unlinked immediately. No
+   `read_bytes()`. The output is the only media that is ever local, and it is
+   local for one upload.
+3. **`_download`/`_upload` become streaming for images too.**
+   `download_to_temp(url) -> Path` and `upload_from_path(path)` replace the
+   `bytes`-returning pair. The image path can afford `bytes` at 10 MB; the
+   helpers are shared, so they stop returning them anyway.
+4. **Concurrency is bounded by a semaphore, not by hope.** Video is
+   `asyncio.Semaphore(1)` — one ffmpeg at a time on one CPU is not a
+   limitation, it is the correct number. Images run 2.
+
+### Memory budget at 1 Gi
+
+| | |
+|---|---|
+| Python + FastAPI + SQLAlchemy + Pillow baseline | ~200 MB |
+| One ffmpeg, 1080p, `-threads 1` | ~150–250 MB |
+| Output in `/tmp` before upload | up to ~150 MB |
+| Headroom | ~250 MB |
+
+That fits 1080p at up to 60s. **It does not fit 4K at CRF 17**, where a 60s
+output alone can exceed 400 MB of tmpfs. Stated plainly rather than discovered
+in production: the honest envelope at 1 Gi is *1080p up to 60s, or 4K up to
+roughly 20s*. If a 4K/60s job has to work, the fix is one flag —
+`--memory=2Gi` — and nothing else in this design changes.
+
+### ffmpeg tuning, and the line it must not cross
+
+There is a standing rule that rendered creatives stay native quality and are
+never downscaled, because they play on physical premium screens. Nothing here
+crosses it. What changes is *how* the encode runs, not what it produces:
+
+- `-threads 1` — one CPU; extra threads cost memory and buy nothing.
+- `-preset` drops from `slow` to `medium` for Studio only. A preset trades
+  encoder time against file size at the **same** CRF. Visual quality is set by
+  `-crf 17`, which does not move, and the output resolution does not move.
+- `-rc-lookahead` trimmed to match the preset — lookahead buffers are frames,
+  and frames at 4K are 33 MB each.
+
+CMS Creative Fit keeps `preset slow`; the two services now tune independently,
+which is a benefit of the split rather than a compromise.
+
+### Image decode is capped by pixels, not bytes
+
+A 10 MB byte cap bounds nothing about image memory. PNG compresses
+pathologically well — a 10 MB file can decode to 20,000 × 20,000, which is
+1.6 GB of RGBA and an instant kill.
+
+`resizer.py` already sets `Image.MAX_IMAGE_PIXELS = 8192 * 8192` (67 MP), and
+that guard ports across unchanged. Worth writing down because the number is
+load-bearing and looks arbitrary: 67 MP is ~268 MB decoded, and Pillow holds
+the source and the resized copy at once, so one image job can touch ~540 MB.
+That is why the image semaphore is 2 and not `CREATIVE_FIT_WORKERS`.
+
+### Where the caps are enforced
+
+Three places, because any one of them alone is bypassable:
+
+| Where | What it stops |
+|---|---|
+| The BFF, before proxying | An obvious oversize upload, cheaply |
+| The GCS resumable session (`size_bytes`) | A client that opens a session and streams more than it declared |
+| After upload, from the blob's real size | A declared size that was a lie |
+
+The 100 MB video cap means a video still **cannot** use `POST /upload` — Cloud
+Run rejects request bodies over 32 MiB at its frontend, before this app runs.
+The direct-to-GCS session pair stays mandatory for video, and now has a second
+reason to exist: it keeps 100 MB out of the container's memory entirely. Images
+at 10 MB are under the frontend limit and keep the simple path.
+
+New settings, replacing the inherited ones:
+
+```
+STUDIO_MAX_IMAGE_BYTES        = 10 * 1024 * 1024
+STUDIO_MAX_VIDEO_BYTES        = 100 * 1024 * 1024
+STUDIO_VIDEO_CONCURRENCY      = 1
+STUDIO_IMAGE_CONCURRENCY      = 2
+STUDIO_VIDEO_PRESET           = "medium"
+```
+
+## Stopping a running job
+
+A Studio user must be able to stop a fit while it is happening — the analyse
+step and the resize/encode alike. The button and the endpoint already exist;
+one half of the server does not honour them.
+
+### What already works
+
+- **A queued job stops dead.** The claim statement only ever selects
+  `status = 'queued'`, so from the instant the cancel commits no worker can see
+  the row. Nothing is spent.
+- **A running *image* job stops within seconds.** `_check_cancelled` runs at
+  seven stage boundaries through the image path, on its own short-lived session
+  so it never pins the worker's connection. The worker throws the result away
+  at the next checkpoint.
+- **The UI is already wired.** `Workspace.tsx` has the Stop control and
+  `api.cancel()` posts to `/jobs/{id}/cancel`. No frontend work.
+
+### The hole: a running video encode ignores the cancel
+
+`_execute_video_job` checkpoints *around* the encode but not *inside* it:
+
+```python
+await _check_cancelled(db, job)          # before
+out_bytes, variant = await run_in_threadpool(_stretch_to_temp, ...)   # ← minutes, uninterruptible
+await _check_cancelled(db, job)          # after — far too late
+```
+
+`_stretch_to_temp` calls ffmpeg through `subprocess.run(...)`, which owns the
+whole blocking call. Cancelling marks the row and returns the page instantly,
+which is why this has never looked broken — but ffmpeg runs to completion in
+the background regardless.
+
+**Why this is worse at 1 CPU than it was at 2/4.** The video semaphore is 1. A
+cancelled 4K encode holds the only video slot for minutes, burning the only
+CPU, while the next user's job waits behind work that nobody wants any more.
+At 2 CPU it was waste; at 1 CPU it is a queue stall.
+
+### The fix: the watchdog already exists, it watches the wrong thing
+
+`video/ffmpeg.py` already runs a background thread that kills a `Popen` when a
+condition fires — `_watch_timeout`, used for hung children. Generalise it to
+take a predicate rather than only a deadline:
+
+```python
+def _watch(process, *, deadline, should_stop, finished, timed_out, stopped):
+    """Kill `process` when the deadline passes OR should_stop() returns True."""
+```
+
+Then the video path passes `should_stop=lambda: job_is_cancelled(job.id)` — a
+poll of the one indexed `status` column every ~2 seconds on its own short-lived
+session, exactly as `_check_cancelled` already does it. On cancel the watcher
+calls `terminate()`, then `kill()` after a short grace period, and
+`_stretch_to_temp` raises `JobCancelled` instead of returning bytes.
+
+This is deliberately not a new mechanism. One watchdog with two reasons to fire
+is far less likely to rot than a second thread doing the same job alongside it.
+
+### Stopping the analyse step
+
+Two different things get called "analysing", and they stop differently:
+
+**Inside a job** (`mode=auto`, where the analyst runs before the worker decides
+resize vs rebuild): add a `_check_cancelled` immediately before and immediately
+after `read_creative`, and give the Gemini call an explicit timeout so a hung
+response cannot pin a worker past the point of caring. The in-flight HTTP call
+itself is not aborted — that generation is already paid for — but nothing
+downstream of it starts.
+
+**The standalone `POST /analyze`** is not a job at all: it is synchronous,
+creates no row, spends no budget, and there is nothing to cancel by id. Stopping
+it is the client aborting the request. The server honours that by checking
+`await request.is_disconnected()` before it spends the Gemini call, so a user
+who changes their mind during the upload does not pay for a verdict nobody will
+read.
+
+### Releasing the slot
+
+The concurrency semaphores are acquired and released in a `finally`, so a
+cancelled job hands its slot back the moment the worker unwinds rather than at
+the end of the encode that no longer matters. This is the change that makes
+cancel useful rather than cosmetic at 1 CPU.
+
+### Budget on cancel is unchanged
+
+A cancel after a worker has started still costs half a rebuild credit, a
+failure costs nothing, and a plain resize is free — the budget is a weighted SUM
+over the rows themselves, so this needs no refund code and gets none.
 
 ## Testing
 
@@ -343,7 +558,12 @@ check, and by exercising the running service. The plan will include:
 - `alembic upgrade head` on an empty database, then `alembic check`.
 - A local end-to-end pass on :8097 — sign in through the BFF, upload, analyze,
   resize, rebuild, refine, cancel; then a video stretch, watching container
-  memory to confirm two concurrent video jobs no longer approach the ceiling.
+  memory to confirm the peak stays inside 1 Gi with a 100 MB source.
+- A stop pass, which is the one most likely to regress silently: cancel a
+  queued job (no worker ever sees it), cancel a running image job (stops at the
+  next checkpoint), cancel a running **video** job and confirm with `ps` that
+  the ffmpeg child is actually gone and the slot is free for the next job,
+  and abort a `POST /analyze` mid-flight and confirm no Gemini call is made.
 - A budget pass: exhaust `STUDIO_DAILY_REBUILD_LIMIT`, confirm `mode=auto`
   degrades to a resize rather than 429-ing, confirm an allowlisted address is
   uncapped and a non-verified email is not.
@@ -359,6 +579,9 @@ check, and by exercising the running service. The plan will include:
 | Engine code now exists in two repos and will drift | Accepted deliberately — they already differ (Studio runs a higher video ceiling). The ported files are pure functions, the least dangerous kind of duplication. |
 | A missed job row during the cutover is an unresolvable spinner | Maintenance window; migrate no `running` rows; verify counts. |
 | `0062` runs before the copy is verified | It is a separate, explicitly gated step, never in the same deploy as the cutover. |
+| 4K/60s video will not fit in 1 Gi | Envelope stated up front; `--memory=2Gi` is a one-flag change that invalidates nothing else. |
+| A 1-CPU 4K encode is slow (minutes) | The contract is already async 202+poll. Studio's stale-reclaim window is tuned to its own encodes, independently of the CMS's. |
+| A cancelled encode leaves an orphan ffmpeg | The watchdog escalates `terminate()` to `kill()`; the stop test asserts on `ps`, not on the API response. |
 | Second Cloud SQL instance costs money | Smallest tier; two tables with a 48-hour retention sweep. |
 
 ## Phases
@@ -367,6 +590,10 @@ check, and by exercising the running service. The plan will include:
    compose, `dev_start.sh`, `CLAUDE.md`. Boots and answers `/health`.
 2. **Port the engine** — `engine/` and `video/` copied with rewritten imports.
    Import-clean, ruff-clean, no database yet.
+2b. **The streaming rewrite** — signed-URL input into ffmpeg, streamed upload
+   out, `bytes`-free media helpers, semaphores, ffmpeg tuning and the caps.
+   This is the work that makes 1 Gi possible and is the riskiest step; do it
+   here, before any of it is load-bearing.
 3. **Jobs** — `studio_users` + `studio_fit_jobs`, migration `0001`, and
    `jobs/service.py` + `jobs/worker.py` rewritten against the single-owner table.
 4. **The public router** — `/api/ext/creative-fit/*` at parity, with shared-secret
