@@ -161,16 +161,15 @@ stated **per IP address**:
     Instantaneous:  no more than 15 calls per second   per IP
     Cumulative:     no more than 1500 calls per hour    per IP
 
-**Enforced**, per the headers on every live response, is stricter:
+The headers observed on 2026-09-09 reported lower values (`Limit-Second: 5`,
+`Limit-Hour: 1000`). **We design against the documented figures** — the user's
+call — pacing at 12/sec to stay under the stated 15.
 
-    X-RateLimit-Limit-Second: 5
-    X-RateLimit-Limit-Hour:   1000
-    Retry-After: 1            (on 429)
-
-Design against **5/sec and 1000/hour** — the observed pair — and treat the
-documented numbers as an upper bound not to rely on. The client reads
-`X-RateLimit-Remaining-Hour` off each response so the real budget can be logged
-rather than discovered by hitting the ceiling.
+That is safe because the ceiling is handled at runtime rather than assumed: the
+client reads `X-RateLimit-Remaining-Hour` off every response, and a 429 is met
+with the server's own `Retry-After` rather than a guess. If the stricter values
+turn out to be what is really applied, the sync pauses a second and continues —
+and `VNNOX_MAX_REQUESTS_PER_SECOND` is one env var to turn down, no code change.
 
 The counter is shared across every endpoint: nine different endpoints called in
 sequence decremented one counter. Because the limit is keyed to the **IP**, the
@@ -187,8 +186,8 @@ Two consequences:
 
 | Approach | Cost/screen/cycle | Max fleet at 5-min polling |
 |---|---|---|
-| 14 per-endpoint calls | 14 req | **~5 screens** |
-| `POST /all` (10 screens/call) | 0.1 req | **~830 screens** |
+| 14 per-endpoint calls | 14 req | **~8 screens** |
+| `POST /all` (10 screens/call) | 0.1 req | **~1250 screens** |
 
 `POST /v2/device-status-monitor/all` is therefore **mandatory**, not an
 optimisation. Per-endpoint routes are used only for on-demand drill-down when an
@@ -198,9 +197,10 @@ operator opens one screen.
 polled on a cycle — fetched on demand when the chart is opened, plus an optional
 daily backfill.
 
-**5/sec is a burst ceiling, not a sustainable rate.** Running at it would spend
-the whole hourly budget in 200 seconds. The sustainable rate is one request every
-3.6 seconds; the 5-minute cycle uses a small fraction of that.
+**The per-second figure is a burst ceiling, not a sustainable rate.** Running
+flat out at 15/sec would spend the whole hourly budget in 100 seconds. The
+sustainable rate is one request every 2.4 seconds; the 5-minute cycle uses a tiny
+fraction of that (12 requests/hour for two screens).
 
 ### The blocker
 

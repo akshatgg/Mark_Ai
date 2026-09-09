@@ -14,7 +14,7 @@
 - **Do not run `next build`** in any web project — it clobbers `.next` under the running dev server. Verify with `npx tsc --noEmit`.
 - **Secrets stay backend-only.** `VNNOX_APP_KEY` / `VNNOX_APP_SECRET` are never `NEXT_PUBLIC_*` and never reach the browser.
 - **Only `/v2/device-status-monitor/*` endpoints may be called.** VNNOX's player, program, real-time-control and scheduled-control APIs are out of bounds — our backend already owns scheduling and playback.
-- **`POST /v2/device-status-monitor/all` is the only endpoint used on a polling cycle.** Enforced rate limit is 5/sec and 1000/hour (the Access Guide documents 15/sec and 1500/hour per IP; the headers are stricter — design against the headers). Per-endpoint polling caps the fleet at ~5 screens. Failed calls decrement the budget too.
+- **`POST /v2/device-status-monitor/all` is the only endpoint used on a polling cycle.** Rate limit per the Access Guide is 15/sec and 1500/hour **per IP**; pace at 12/sec to stay under. Live headers have reported lower values, so always honour `Retry-After` on a 429 rather than assuming the documented ceiling holds. Failed calls decrement the budget too. Per-endpoint polling would cap the fleet at ~8 screens.
 - **`unknown` is never rendered as `ok`.** A screen VNNOX did not answer for has grey cabinets, not green.
 - **The gate is a KEYWORD, never a boolean and never inference.** `screens.player_kind` (`andbox`, `novastar`, …) selects a telemetry adapter from a registry. More media players are coming, each with its own API, so anything that reduces this to on/off is wrong. `andbox` is not special-cased — it simply has no registered adapter.
 - **Only a person sets the keyword** — the installer at enrollment, or an operator in the CMS. Serial/vendor detection by the APK is a prefill suggestion and must never set it.
@@ -362,10 +362,11 @@ In `app/core/config.py`, alongside the other optional integration keys:
     VNNOX_APP_KEY: Optional[str] = None
     VNNOX_APP_SECRET: Optional[str] = None
     VNNOX_ENABLED: bool = True
-    # Their published ceiling is 5/sec and 1000/hour, account-wide. We pace well
-    # under the per-second wall; the hourly budget is protected by only ever
-    # polling through the bulk endpoint.
-    VNNOX_MAX_REQUESTS_PER_SECOND: float = 3.0
+    # Documented ceiling is 15/sec and 1500/hour per IP. Pace just under the
+    # stated per-second wall; the hourly budget is protected by only ever polling
+    # through the bulk endpoint. Turn this down if 429s appear in the logs — some
+    # responses have reported a lower enforced limit than the guide states.
+    VNNOX_MAX_REQUESTS_PER_SECOND: float = 12.0
     VNNOX_TIMEOUT_SECONDS: float = 30.0
     VNNOX_MAX_RETRIES: int = 3
 ```
@@ -450,15 +451,13 @@ Server clock skew must stay within 5 minutes, so a host with a drifting clock
 fails every call with a signature error — worth knowing before debugging the
 signature itself.
 
-Rate limiting is documented in the Access Guide as 15/sec and 1500/hour PER IP,
-but the headers on every live response enforce something stricter:
+Rate limiting is documented in the Access Guide as 15/sec and 1500/hour PER IP.
+Live responses have reported lower values in their headers, so the ceiling is
+handled rather than assumed: read `X-RateLimit-Remaining-*` off every response,
+and on a 429 wait for the server's own `Retry-After` instead of guessing.
 
-    X-RateLimit-Limit-Second: 5      X-RateLimit-Limit-Hour: 1000
-
-Trust the headers, not the guide. The counter is shared across all endpoints, and
-a failed call (406 "screen not exist") decrements it exactly like a success. We
-pace under the per-second wall and honour `Retry-After` on a 429 rather than
-guessing a backoff.
+The counter is shared across all endpoints, and a failed call
+(406 "screen not exist") decrements it exactly like a success.
 """
 
 from __future__ import annotations
@@ -1999,7 +1998,7 @@ async def cron_vnnox_health(
 
     Runs on cron-job.org every 5 minutes (GCP Cloud Scheduler is disabled on
     this project). At 12 cycles/hour and one request per ten screens, a
-    hundred-screen fleet spends 120 of the 1000 hourly requests.
+    hundred-screen fleet spends 120 of the 1500 hourly requests.
     """
     if not settings.VNNOX_ENABLED:
         return {"skipped": True}
