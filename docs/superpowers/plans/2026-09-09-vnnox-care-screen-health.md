@@ -2080,6 +2080,128 @@ git commit -m "feat(health): poll VNNOX Care on a cron and persist per-cabinet s
 
 ---
 
+## Task 7b: One writer per screen — the vendor wins over the heartbeat
+
+Phase A/B made the APK report its own panel health on the heartbeat. On a screen a vendor adapter polls, that is a **second writer to the same rows**, and they disagree.
+
+Concretely: our APK cannot speak NovaStar's protocol, so `pollController()` returns null and the beat carries `controller: null`. `record_health` then computes `tier = "display"` and overwrites the `controller`/`monitoring` tier the VNNOX sync just wrote, along with `observed_at`. Panel states survive (the service already refuses to treat an absent controller as a recovery), but the tier flaps every 60 seconds — and the tier is what gates the Cabinets and Environment tabs, so an operator watches them enable and disable on a loop.
+
+Fixed on the backend so no APK release is needed.
+
+**Files:**
+- Modify: `app/playback/service.py` (the heartbeat health block)
+- Test: `tests/test_health_writer_precedence.py`
+
+**Interfaces:**
+- Consumes: `vendor_for` (Task 6b).
+- Produces: `def vendor_owns_health(player_kind: str | None) -> bool` in `app/health/link_service.py`.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_health_writer_precedence.py
+"""Exactly one writer per screen's health.
+
+A screen polled by a vendor adapter must ignore the heartbeat's health payload.
+Both write the same rows, and the player — which cannot speak the controller's
+protocol — would otherwise downgrade the tier on every beat.
+"""
+
+from app.health.link_service import vendor_owns_health
+
+
+def test_a_novastar_screen_is_owned_by_its_vendor():
+    assert vendor_owns_health("novastar") is True
+
+
+def test_an_andbox_screen_still_reports_its_own_health():
+    """Our own player is the only source for those screens, so the heartbeat
+    must keep working exactly as it does today."""
+    assert vendor_owns_health("andbox") is False
+
+
+def test_an_unknown_keyword_falls_back_to_the_heartbeat():
+    """A keyword with no adapter has nothing polling it, so the player's own
+    reading is better than nothing."""
+    assert vendor_owns_health("colorlight") is False
+
+
+def test_missing_keyword_falls_back_to_the_heartbeat():
+    assert vendor_owns_health(None) is False
+```
+
+- [ ] **Step 2: Verify the test is valid**
+
+```bash
+poetry run python -m py_compile tests/test_health_writer_precedence.py && poetry run ruff check tests/test_health_writer_precedence.py
+```
+
+- [ ] **Step 3: Add the predicate**
+
+In `app/health/link_service.py`:
+
+```python
+def vendor_owns_health(player_kind: Optional[str]) -> bool:
+    """Whether a telemetry adapter is authoritative for this screen's health.
+
+    When one is, the heartbeat's health payload is DROPPED rather than merged.
+    The player physically cannot see what the vendor sees — on a NovaStar box it
+    cannot speak the controller's protocol at all — so merging would mean the
+    less-informed writer overwriting the better-informed one every 60 seconds.
+    """
+    from app.health.vendors.registry import vendor_for
+
+    return vendor_for(player_kind) is not None
+```
+
+- [ ] **Step 4: Guard the heartbeat**
+
+In `app/playback/service.py`, wrap the existing health block:
+
+```python
+    if payload.health is not None:
+        try:
+            from app.health import link_service
+            from app.health import service as health_service
+
+            if link_service.vendor_owns_health(screen.player_kind):
+                # A vendor adapter polls this screen and knows more than the
+                # player does. Dropping the payload is not data loss: the player
+                # cannot read this controller, so its report is strictly worse.
+                logger.debug(
+                    "Ignoring heartbeat health for %s; %s adapter is authoritative",
+                    screen_id,
+                    screen.player_kind,
+                )
+            else:
+                await health_service.record_health(db, screen_id, payload.health)
+        except Exception:  # noqa: BLE001 - health is never worth a failed beat
+            logger.warning(
+                "Failed to record panel health for screen %s", screen_id, exc_info=True
+            )
+```
+
+- [ ] **Step 5: Verify**
+
+```bash
+poetry run python -c "
+from app.health.link_service import vendor_owns_health as f
+assert f('novastar') and not f('andbox') and not f('colorlight') and not f(None)
+print('precedence ok')
+"
+poetry run ruff check app/health app/playback
+```
+Expected: `precedence ok`, no ruff output.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/health/link_service.py app/playback/service.py tests/test_health_writer_precedence.py
+git commit -m "fix(health): a vendor adapter outranks the heartbeat for its screens"
+```
+
+---
+
 ## Task 8: Setting the keyword — operator choice, plus heartbeat detection
 
 **Files:**
@@ -2394,7 +2516,9 @@ git commit -m "feat(health): bind screens to VNNOX from the heartbeat, with an o
 
 ---
 
-## Task 9: APK — report the controller serial
+## Task 9: APK — report the controller serial  *(optional, defer past Saturday)*
+
+**Nothing in the VNNOX integration requires this task or Task 9b.** The keyword and the serial are both settable in the CMS, so panel health works with no APK release at all. These two tasks only save typing at install time, and shipping a new build the week of a hardware deployment adds risk for convenience. Do them after Saturday.
 
 **Files:**
 - Modify: `markai-player-apk/app/src/main/java/tech/markai/player/health/DeviceInfo.kt`
