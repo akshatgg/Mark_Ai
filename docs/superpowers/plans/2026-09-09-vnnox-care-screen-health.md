@@ -888,6 +888,15 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_screens_player_kind", "screens", ["player_kind"])
+    # Who last set the keyword: "default" | "stamp" | "cms". The heartbeat fires
+    # every 60s and would otherwise revert a human's correction within a minute —
+    # 1,440 writes a day against one considered edit.
+    op.add_column(
+        "screens",
+        sa.Column(
+            "player_kind_source", sa.String(16), nullable=False, server_default="default"
+        ),
+    )
 
     # Detection output, never a gate: what the APK saw on the box it runs on.
     # Used only to prefill the screen form and to suggest a keyword.
@@ -900,6 +909,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_column("screens", "player_kind_source")
     op.drop_column("screens", "controller_vendor")
     op.drop_column("screens", "controller_serial")
     op.drop_index("ix_screens_player_kind", table_name="screens")
@@ -921,6 +931,11 @@ In `app/screens/models.py`, beside the other device-profile columns (`model`, `m
     # app/health/vendors/registry.py.
     player_kind: Mapped[str] = mapped_column(
         String(32), default="andbox", server_default="andbox", nullable=False
+    )
+    # Precedence: "default" may be overwritten by anything, "stamp" only by the
+    # CMS, "cms" only by the CMS. See link_service.apply_reported_player_kind.
+    player_kind_source: Mapped[str] = mapped_column(
+        String(16), default="default", server_default="default", nullable=False
     )
 
     # What the APK detected about the box it runs on. Informational ONLY — a
@@ -2783,7 +2798,54 @@ In `app/screens/schemas.py` add `player_kind: Optional[str] = None` to the regis
 
 A `novastar` screen therefore arrives linked but with no serial yet — visible in the CMS as "set to NovaStar, no VNNOX serial", which is an honest state and exactly what the operator needs to finish.
 
-- [ ] **Step 7: Offer the choice on the CMS download page**
+- [ ] **Step 7: Carry the stamp on the heartbeat, not only registration**
+
+**An in-place update never re-registers.** `SessionRecovery` re-registers only when the backend rejects the auth token; a normal OTA update installs a new APK and keeps its credentials. So applying the stamp at registration alone would be inert on every box that is *updated* rather than freshly enrolled — which, after the first install, is all of them.
+
+The APK therefore reports its stamped keyword on every heartbeat, and the backend applies it under the precedence ladder.
+
+In `HeartbeatDto.kt`:
+
+```kotlin
+    // The keyword stamped into this APK by the CMS at download. Sent every beat
+    // because an in-place update never re-registers: registration alone would
+    // never reach a box that was updated rather than newly enrolled.
+    @SerialName("player_kind") val playerKind: String? = null,
+```
+
+Populate it in `PlayerService` from `EmbeddedKey.playerKind(context)`.
+
+In `app/health/link_service.py`:
+
+```python
+async def apply_reported_player_kind(
+    db: AsyncSession, screen: Screen, reported: Optional[str]
+) -> None:
+    """Apply a keyword the box reported, if nobody better has spoken.
+
+    The precedence ladder exists because this runs every 60 seconds while a
+    human edits once. Without it a CMS correction would survive less than a
+    minute.
+
+        default  -> may be set by the stamp or the CMS
+        stamp    -> may be changed only in the CMS
+        cms      -> may be changed only in the CMS
+
+    A disagreement between the stamp and the CMS is therefore SHOWN, not
+    resolved: the CMS wins, and the page can say what the box believes.
+    """
+    kind = (reported or "").strip().lower()
+    if not kind or kind == screen.player_kind:
+        return
+    if screen.player_kind_source != "default":
+        return
+    screen.player_kind = kind
+    screen.player_kind_source = "stamp"
+```
+
+Call it from the heartbeat handler beside `record_detected_controller`, inside the same best-effort try block. `set_player_kind` (Task 8) sets `player_kind_source = "cms"`, and registration sets `"stamp"`.
+
+- [ ] **Step 8: Offer the choice on the CMS download page**
 
 Two buttons rather than one, labelled from `PLAYER_KINDS` so a future integration adds itself:
 
@@ -2795,7 +2857,7 @@ Two buttons rather than one, labelled from `PLAYER_KINDS` so a future integratio
 ))}
 ```
 
-- [ ] **Step 8: Verify**
+- [ ] **Step 9: Verify**
 
 ```bash
 cd markai-signage-api
@@ -2813,7 +2875,7 @@ cd ../markai-player-apk && ./gradlew :app:compileDebugKotlin
 ```
 Expected: `stamp ok`, no ruff output, `BUILD SUCCESSFUL`.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git commit -am "feat(apk): stamp the player keyword into the personalised download"
