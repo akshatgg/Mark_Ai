@@ -59,6 +59,34 @@ The APK's detected serial is kept as a **prefill suggestion** on the form, never
 as a trigger. Vendor detection survives only as a hint shown to the operator
 ("this box looks like a NovaStar — enable panel monitoring?"), never as a gate.
 
+### The choice is offered twice, and it is the same choice
+
+**At install**, on the existing first-launch enrollment screen — the installer is
+standing at the box and knows what it is, which is the best-informed moment
+anyone will ever have:
+
+> **What is this box?**
+> ( ) Our media player
+> ( ) NovaStar controller → *serial:* `[2YHA23C12A3A10080149]` (detected)
+
+**In the CMS**, on the screen page, for correction and for screens already in the
+field whose APK predates this.
+
+Both write the same `screen_vnnox_link` row. Neither infers anything.
+
+Three rules keep the two from fighting:
+
+* **Registration creates, never overwrites.** Re-registration is idempotent on
+  `device_uid` and happens on reinstall or factory reset. If a link row already
+  exists, registration leaves it alone — otherwise a reinstall would silently
+  undo an operator's CMS correction.
+* **No answer means no link.** The zero-touch/MDM path shows no UI and prompts
+  nobody (`require_enrollment_key: false`), so those screens arrive unlinked and
+  an operator sets the source in the CMS. Unmonitored is the safe default;
+  wrongly monitored is not.
+* **The CMS is the authority afterwards.** Install-time is a convenience for
+  getting it right the first time, not a second source of truth.
+
 ## Verified against the live API (2026-09-09)
 
 All facts below were confirmed by real calls with the production key, not read from

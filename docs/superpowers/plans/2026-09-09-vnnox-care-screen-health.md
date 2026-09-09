@@ -2206,6 +2206,195 @@ git commit -m "feat(health): report the controller serial so the backend can bin
 
 ---
 
+## Task 9b: Ask at install time
+
+The installer is physically at the box and knows what it is. That is a better moment to ask than any later one, so the existing first-launch enrollment screen asks it — the same question the CMS asks, writing the same row.
+
+**Files:**
+- Modify: `markai-player-apk/app/src/main/java/tech/markai/player/net/dto/RegisterDto.kt`
+- Modify: `markai-player-apk/app/src/main/java/tech/markai/player/ui/PlayerActivity.kt` (the key-entry screen)
+- Modify: `markai-player-apk/app/src/main/java/tech/markai/player/enroll/Enrollment.kt`
+- Modify: `app/screens/schemas.py`, `app/screens/service.py` (register handler)
+- Test: `tests/test_vnnox_register_link.py`
+
+**Interfaces:**
+- Consumes: `set_monitoring`, `clean_serial` (Task 8).
+- Produces: `RegisterRequest.controller_kind: String?` (`"media_player"` | `"novastar"`) and `RegisterRequest.controller_serial: String?`.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_vnnox_register_link.py
+"""Install-time choice of monitoring source.
+
+Registration is idempotent on device_uid and re-runs on every reinstall or
+factory reset. The rule that matters is therefore not "does it create a link"
+but "does it leave an existing one alone" — otherwise reinstalling a box would
+silently revert an operator's CMS correction.
+"""
+
+from app.screens.service import should_create_link_on_register
+
+
+def test_novastar_with_a_serial_creates_a_link():
+    assert should_create_link_on_register(
+        kind="novastar", serial="2YHA23C12A3A10080149", existing=None
+    ) is True
+
+
+def test_our_media_player_creates_nothing():
+    assert should_create_link_on_register(
+        kind="media_player", serial=None, existing=None
+    ) is False
+
+
+def test_no_answer_creates_nothing():
+    """The zero-touch/MDM path prompts nobody. Those screens must arrive
+    unmonitored and be set up in the CMS — unmonitored is the safe default."""
+    assert should_create_link_on_register(kind=None, serial=None, existing=None) is False
+
+
+def test_a_detected_serial_alone_creates_nothing():
+    """Detection is never the gate, even at registration."""
+    assert should_create_link_on_register(
+        kind=None, serial="2YHA23C12A3A10080149", existing=None
+    ) is False
+
+
+def test_an_existing_link_is_never_overwritten():
+    """A reinstall must not undo a CMS correction."""
+    assert should_create_link_on_register(
+        kind="novastar", serial="NEWSERIAL", existing=object()
+    ) is False
+
+
+def test_novastar_without_a_serial_still_creates_the_link():
+    """The installer knows it is a NovaStar but may not have the SN to hand.
+    Linked-but-not-addressable is a real state; the CMS then asks for the SN."""
+    assert should_create_link_on_register(
+        kind="novastar", serial=None, existing=None
+    ) is True
+```
+
+- [ ] **Step 2: Verify the test is valid**
+
+```bash
+poetry run python -m py_compile tests/test_vnnox_register_link.py && poetry run ruff check tests/test_vnnox_register_link.py
+```
+
+- [ ] **Step 3: Add the fields to the register DTO**
+
+In `RegisterDto.kt`, inside `RegisterRequest`:
+
+```kotlin
+    // What the installer answered on the first-launch screen: "media_player" or
+    // "novastar". Null on the zero-touch path, which prompts nobody — those
+    // screens arrive unmonitored and are set up in the CMS. This is the ONLY
+    // thing that can put a screen into the VNNOX poll at registration; the
+    // detected serial below cannot, on its own.
+    @SerialName("controller_kind") val controllerKind: String? = null,
+    // Prefilled from ro.serialno, editable by the installer.
+    @SerialName("controller_serial") val controllerSerial: String? = null,
+```
+
+- [ ] **Step 4: Add the question to the enrollment screen**
+
+In `PlayerActivity.kt`, after the enrollment key is accepted and before registration is attempted, show a second step with two buttons — "Our media player" and "NovaStar controller". Choosing NovaStar reveals an editable field prefilled with `DeviceInfo.controllerSerial()`.
+
+Pass the answer through `Enrollment.enroll(...)` into `RegisterRequest`:
+
+```kotlin
+    controllerKind = if (isNovastar) "novastar" else "media_player",
+    controllerSerial = if (isNovastar) enteredSerial.ifBlank { null } else null,
+```
+
+Show this step **only** when the key-entry UI is already being shown. On the `require_enrollment_key: false` path nobody is prompted, and adding a prompt there would break zero-touch provisioning.
+
+- [ ] **Step 5: Add the backend fields and rule**
+
+In `app/screens/schemas.py`, on the register request model:
+
+```python
+    # The installer's answer on the first-launch screen. None on the zero-touch
+    # path. See should_create_link_on_register for why detection alone is not
+    # enough to act on.
+    controller_kind: Optional[str] = None
+    controller_serial: Optional[str] = None
+```
+
+In `app/screens/service.py`:
+
+```python
+def should_create_link_on_register(
+    *, kind: Optional[str], serial: Optional[str], existing: object | None
+) -> bool:
+    """Whether registration should put this screen under VNNOX monitoring.
+
+    Registration is idempotent and re-runs on every reinstall, so an EXISTING
+    link always wins: the CMS is the authority once a screen is in the field,
+    and a reinstall must not silently revert a correction made there.
+
+    A serial with no answer is not enough. Detection never opens this gate — at
+    registration or anywhere else.
+    """
+    if existing is not None:
+        return False
+    return kind == "novastar"
+```
+
+And in the register handler, after the screen row exists:
+
+```python
+    from app.health import link_service
+
+    # The keyword the installer's choice produced is the whole trigger. Anything
+    # other than "novastar" — including "media_player" and no answer at all —
+    # leaves this screen out of the VNNOX poll entirely.
+    existing = await link_service.get_link(db, screen.id)
+    if should_create_link_on_register(
+        kind=payload.controller_kind,
+        serial=payload.controller_serial,
+        existing=existing,
+    ):
+        await link_service.set_monitoring(
+            db, screen.id, True, payload.controller_serial
+        )
+
+    # Detection is recorded separately and cannot open the gate. The vendor here
+    # comes from the device profile the APK sniffed, NOT from the answer above —
+    # keeping them distinct is what lets the CMS say "this looks like a NovaStar
+    # but nobody enabled monitoring".
+    await link_service.record_detected_controller(
+        db,
+        screen,
+        payload.device_info.get("controller_vendor"),
+        payload.controller_serial,
+    )
+```
+
+- [ ] **Step 6: Verify**
+
+```bash
+cd markai-signage-api && poetry run ruff check app/screens app/health
+poetry run python -c "
+from app.screens.service import should_create_link_on_register as f
+assert f(kind='novastar', serial='X', existing=None) is True
+assert f(kind='novastar', serial='X', existing=object()) is False
+assert f(kind=None, serial='X', existing=None) is False
+print('register gate ok')
+"
+cd ../markai-player-apk && ./gradlew :app:compileDebugKotlin
+```
+Expected: `register gate ok`, then `BUILD SUCCESSFUL`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git commit -am "feat(health): ask the installer whether the box is a NovaStar"
+```
+
+---
+
 ## Task 10: CMS — the monitoring-source selector, badge, and corrected tier copy
 
 **Files:**
