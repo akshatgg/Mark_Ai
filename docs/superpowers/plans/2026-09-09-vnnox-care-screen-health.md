@@ -61,7 +61,7 @@ the plan.
 | `app/health/link_models.py` | `ScreenVnnoxLink` ORM model |
 | `app/health/link_service.py` | link CRUD + upsert-from-heartbeat |
 | `app/health/router.py` | *(modify)* add link endpoints |
-| `alembic/versions/0065_screen_vnnox_link.py` | the link table |
+| `alembic/versions/0066_screen_vnnox_link.py` | the link table |
 | `tests/fixtures/vnnox/*.json` | recorded payloads from the published examples |
 
 **`markai-Web-cms`** — extends existing files under `src/components/screen-health/` and `src/app/(dashboard)/screen-health/`.
@@ -89,12 +89,30 @@ git checkout -b feat/vnnox-care-health origin/main
 git cherry-pick f393d4c
 ```
 
-- [ ] **Step 2: Confirm the migration slot is still free**
+- [ ] **Step 2: Re-point the migration onto main's head**
+
+The cherry-picked `0038_panel_health` declares `down_revision = "0037_creative_fit_jobs"`, and main's `0039_screen_location_source` declares the same parent. Left alone that makes **two alembic heads** and `alembic upgrade head` fails. A free filename is not enough — the parent pointer is what matters.
+
+Renumber it to follow main's actual head:
 
 ```bash
-ls alembic/versions | grep ^0038
+poetry run alembic heads          # expect: 0064_drop_studio (head)
+git mv alembic/versions/0038_panel_health.py alembic/versions/0065_panel_health.py
 ```
-Expected: exactly `0038_panel_health.py` and nothing else. If another `0038_*` appears, rename the file and its `revision` string to the next free number and set `down_revision` to the current head from `poetry run alembic heads`.
+
+Then edit the new file's header:
+
+```python
+revision: str = "0065_panel_health"
+down_revision: Union[str, Sequence[str], None] = "0064_drop_studio"
+```
+
+Verify a single head remains:
+
+```bash
+poetry run alembic heads
+```
+Expected: `0065_panel_health (head)` — exactly one line. Two lines means the parent is still wrong.
 
 - [ ] **Step 3: Verify it imports and lints**
 
@@ -657,7 +675,7 @@ git commit -m "feat(health): signed VNNOX client with rate-limit pacing"
 ## Task 4: `player_kind` keyword + the NovaStar adapter's config table
 
 **Files:**
-- Create: `app/health/link_models.py`, `alembic/versions/0065_screen_vnnox_link.py`
+- Create: `app/health/link_models.py`, `alembic/versions/0066_screen_vnnox_link.py`
 - Modify: `app/models.py` (import the model so Alembic and `create_all` see it)
 - Test: `tests/test_vnnox_link.py`
 
@@ -803,25 +821,21 @@ from app.health.link_models import ScreenVnnoxLink  # noqa: F401
 
 - [ ] **Step 5: Write the migration**
 
-First find the current head:
-```bash
-poetry run alembic heads
-```
-Use that value as `down_revision` below (shown as `<HEAD>`).
+Task 1 left `0065_panel_health` as the head, so this one follows it.
 
 ```python
-# alembic/versions/0065_screen_vnnox_link.py
+# alembic/versions/0066_screen_vnnox_link.py
 """screen_vnnox_link — bind a screen to its VNNOX Care device
 
-Revision ID: 0065_screen_vnnox_link
-Revises: <HEAD>
+Revision ID: 0066_screen_vnnox_link
+Revises: 0065_panel_health
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0065_screen_vnnox_link"
-down_revision = "<HEAD>"
+revision = "0066_screen_vnnox_link"
+down_revision = "0065_panel_health"
 branch_labels = None
 depends_on = None
 
@@ -923,7 +937,7 @@ poetry run python -c "
 from app.health.link_models import ScreenVnnoxLink as L
 print(L(screen_id='s', vnnox_sn='  A ').effective_sn, L(screen_id='s').pollable)
 "
-poetry run ruff check app/health/link_models.py app/screens/models.py alembic/versions/0065_screen_vnnox_link.py
+poetry run ruff check app/health/link_models.py app/screens/models.py alembic/versions/0066_screen_vnnox_link.py
 poetry run alembic upgrade head && poetry run alembic downgrade -1 && poetry run alembic upgrade head
 ```
 Expected: prints `A False`; no ruff output; migration applies, reverses and reapplies cleanly.
@@ -931,7 +945,7 @@ Expected: prints `A False`; no ruff output; migration applies, reverses and reap
 - [ ] **Step 8: Commit**
 
 ```bash
-git add app/health/link_models.py app/models.py app/screens/models.py alembic/versions/0065_screen_vnnox_link.py tests/test_vnnox_link.py
+git add app/health/link_models.py app/models.py app/screens/models.py alembic/versions/0066_screen_vnnox_link.py tests/test_vnnox_link.py
 git commit -m "feat(health): screen_vnnox_link table gates VNNOX polling"
 ```
 

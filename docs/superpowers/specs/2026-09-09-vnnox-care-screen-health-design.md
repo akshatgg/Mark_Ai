@@ -244,9 +244,14 @@ access, and is the check for whether this is fixed.
 
 ## Data model
 
-### Existing (Phase A/B, migration `0038_panel_health`)
+### Existing (Phase A/B, migration `0038_panel_health` → renumbered `0065`)
 
-Slot `0038` is still free on `main`, so the migration rebases cleanly.
+The stranded migration declares `down_revision = "0037_creative_fit_jobs"`, and
+main's `0039_screen_location_source` declares the same parent. Cherry-picked
+unchanged it would create **two alembic heads** and break `alembic upgrade head`.
+It is renumbered to `0065_panel_health` with `down_revision = "0064_drop_studio"`
+so the chain stays linear. A free filename was never the issue; the parent
+pointer was.
 
 | Table | Behaviour | Holds |
 |---|---|---|
@@ -467,7 +472,7 @@ agent (`ruff` is the gate; the user runs the suite).
 | Account mismatch — key cannot see the screens | Must be fixed externally; nothing verifies until then |
 | Taurus `ro.serialno` ≠ VNNOX SN | Operator types the SN on the form; detection is only a prefill |
 | Dead cabinet drops out of `monitor` rather than flagging false | Adapter treats absent and `false` identically |
-| Phase A/B stranded 49 commits behind `main` | Rebase first, as its own step; migration slot `0038` is free |
+| Phase A/B stranded 49 commits behind `main` | Cherry-pick first, as its own step; the migration must be renumbered onto main's head or alembic branches |
 | Camera endpoints unverified (500s) | Out of scope for v1 |
 | Alarm endpoint may be current-only, so history starts empty | Settled by one call on Saturday; the wall has 48 historical and 0 active alarms, so an empty response proves current-only |
 | Existing AndBox screen must be unaffected | `andbox` backfill, no enrollment prompt on an upgraded box, byte-identical heartbeat |
