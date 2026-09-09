@@ -2602,194 +2602,222 @@ git commit -m "feat(health): report the controller serial so the backend can bin
 
 ---
 
-## Task 9b: Ask at install time
+## Task 9b: Stamp the keyword into the downloaded APK
 
-The installer is physically at the box and knows what it is. That is a better moment to ask than any later one, so the existing first-launch enrollment screen asks it — the same question the CMS asks, writing the same row.
+The CMS already personalises each download: it writes the screenowner's enrollment key into the APK Signing Block of an already-signed binary, because *"a signage panel has no keyboard, so nobody can type a key on it."* The player keyword has exactly the same problem and gets the same answer.
+
+This replaces an earlier plan to prompt the installer on the box. Stamping is strictly better: it needs no UI on a device with no keyboard, and it works on the zero-touch/MDM path, which shows no prompt at all and therefore could never have been asked.
 
 **Files:**
-- Modify: `markai-player-apk/app/src/main/java/tech/markai/player/net/dto/RegisterDto.kt`
-- Modify: `markai-player-apk/app/src/main/java/tech/markai/player/ui/PlayerActivity.kt` (the key-entry screen)
-- Modify: `markai-player-apk/app/src/main/java/tech/markai/player/enroll/Enrollment.kt`
-- Modify: `app/screens/schemas.py`, `app/screens/service.py` (register handler)
-- Test: `tests/test_vnnox_register_link.py`
+- Modify: `app/apk/signing_block.py` (payload + reader), `app/apk/service.py` (personalised object path)
+- Modify: `app/screens/schemas.py`, `app/screens/service.py` (registration)
+- Modify: `markai-player-apk/.../enroll/EmbeddedKey.kt`, `.../enroll/Enrollment.kt`, `.../net/dto/RegisterDto.kt`
+- Modify: `markai-Web-cms` download page
+- Test: `tests/test_apk_player_kind_stamp.py`
 
 **Interfaces:**
-- Consumes: `set_player_kind`, `clean_serial` (Task 8).
-- Produces: `RegisterRequest.playerKind: String?` (`"andbox"` | `"novastar"` | future keywords) and `RegisterRequest.controllerSerial: String?`.
+- Consumes: `set_player_kind` (Task 8).
+- Produces: signing-block payload key `"p"`; `read_player_kind(apk: bytes) -> str | None`; `inject_key(apk, enrollment_key, owner_id, player_kind=None)`; `RegisterRequest.playerKind`.
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/test_vnnox_register_link.py
-"""Install-time choice of monitoring source.
+# tests/test_apk_player_kind_stamp.py
+"""The player keyword travels in the APK the CMS hands out.
 
-Registration is idempotent on device_uid and re-runs on every reinstall or
-factory reset. The rule that matters is therefore not "does it create a link"
-but "does it leave an existing one alone" — otherwise reinstalling a box would
-silently revert an operator's CMS correction.
+Same reasoning as the enrollment key: the box has no keyboard. Stamping is what
+lets a screen arrive already knowing which telemetry adapter serves it, on the
+zero-touch path as well as a hand install.
 """
 
-from app.screens.service import should_create_link_on_register
+import json
+
+from app.apk.signing_block import MARK_BLOCK_ID, build_payload, parse_payload
 
 
-def test_novastar_with_a_serial_creates_a_link():
-    assert should_create_link_on_register(
-        kind="novastar", serial="2YHA23C12A3A10080149", existing=None
-    ) is True
+def test_payload_carries_the_keyword_alongside_the_key():
+    raw = build_payload("MRKA-7F2K-9B3D", "owner-1", "novastar")
+    assert json.loads(raw)["p"] == "novastar"
 
 
-def test_andbox_creates_nothing():
-    assert should_create_link_on_register(
-        kind="andbox", serial=None, existing=None
-    ) is False
+def test_payload_omits_the_keyword_when_none_was_chosen():
+    """A build with no keyword must be byte-compatible with the old payload, so
+    an APK downloaded before this change still parses."""
+    assert "p" not in json.loads(build_payload("MRKA-7F2K-9B3D", "owner-1", None))
 
 
-def test_no_answer_creates_nothing():
-    """The zero-touch/MDM path prompts nobody. Those screens must arrive
-    unmonitored and be set up in the CMS — unmonitored is the safe default."""
-    assert should_create_link_on_register(kind=None, serial=None, existing=None) is False
+def test_parse_reads_back_both_fields():
+    parsed = parse_payload(build_payload("KEY", "owner-1", "novastar"))
+    assert parsed == {"key": "KEY", "owner_id": "owner-1", "player_kind": "novastar"}
 
 
-def test_a_detected_serial_alone_creates_nothing():
-    """Detection is never the gate, even at registration."""
-    assert should_create_link_on_register(
-        kind=None, serial="2YHA23C12A3A10080149", existing=None
-    ) is False
+def test_parse_of_an_old_payload_yields_no_keyword():
+    old = json.dumps({"v": 1, "k": "KEY", "o": "owner-1"}).encode()
+    assert parse_payload(old)["player_kind"] is None
 
 
-def test_an_existing_link_is_never_overwritten():
-    """A reinstall must not undo a CMS correction."""
-    assert should_create_link_on_register(
-        kind="novastar", serial="NEWSERIAL", existing=object()
-    ) is False
-
-
-def test_novastar_without_a_serial_still_creates_the_link():
-    """The installer knows it is a NovaStar but may not have the SN to hand.
-    Linked-but-not-addressable is a real state; the CMS then asks for the SN."""
-    assert should_create_link_on_register(
-        kind="novastar", serial=None, existing=None
-    ) is True
+def test_parse_rejects_a_non_string_keyword():
+    """The block is attacker-reachable in principle — it is a file on a box in a
+    cafe. A malformed keyword must read as absent, never crash registration."""
+    bad = json.dumps({"v": 1, "k": "KEY", "o": "o", "p": {"x": 1}}).encode()
+    assert parse_payload(bad)["player_kind"] is None
 ```
 
 - [ ] **Step 2: Verify the test is valid**
 
 ```bash
-poetry run python -m py_compile tests/test_vnnox_register_link.py && poetry run ruff check tests/test_vnnox_register_link.py
+poetry run python -m py_compile tests/test_apk_player_kind_stamp.py && poetry run ruff check tests/test_apk_player_kind_stamp.py
 ```
 
-- [ ] **Step 3: Add the fields to the register DTO**
+- [ ] **Step 3: Extend the payload**
 
-In `RegisterDto.kt`, inside `RegisterRequest`:
-
-```kotlin
-    // What the installer answered on the first-launch screen: "andbox", "novastar", or a
-    // keyword added later. Null on the zero-touch path, which prompts nobody — those
-    // screens arrive unmonitored and are set up in the CMS. This is the ONLY
-    // thing that can put a screen into the VNNOX poll at registration; the
-    // detected serial below cannot, on its own.
-    @SerialName("player_kind") val playerKind: String? = null,
-    // Prefilled from ro.serialno, editable by the installer.
-    @SerialName("controller_serial") val controllerSerial: String? = null,
-```
-
-- [ ] **Step 4: Add the question to the enrollment screen**
-
-In `PlayerActivity.kt`, after the enrollment key is accepted and before registration is attempted, show a second step with two buttons — "Our media player" and "NovaStar controller". Choosing NovaStar reveals an editable field prefilled with `DeviceInfo.controllerSerial()`.
-
-Pass the answer through `Enrollment.enroll(...)` into `RegisterRequest`:
-
-```kotlin
-    playerKind = if (isNovastar) "novastar" else "andbox",
-    controllerSerial = if (isNovastar) enteredSerial.ifBlank { null } else null,
-```
-
-Show this step **only** when the key-entry UI is already being shown. On the `require_enrollment_key: false` path nobody is prompted, and adding a prompt there would break zero-touch provisioning.
-
-- [ ] **Step 5: Add the backend fields and rule**
-
-In `app/screens/schemas.py`, on the register request model:
+In `app/apk/signing_block.py`, factor the payload out of `inject_key` so it can be tested directly, and add the keyword:
 
 ```python
-    # The installer's answer on the first-launch screen. None on the zero-touch
-    # path. See should_create_link_on_register for why detection alone is not
-    # enough to act on.
-    player_kind: Optional[str] = None
-    controller_serial: Optional[str] = None
-```
+def build_payload(
+    enrollment_key: str, owner_id: str, player_kind: str | None = None
+) -> bytes:
+    """The JSON stamped into the signing block.
 
-In `app/screens/service.py`:
-
-```python
-def should_create_link_on_register(
-    *, kind: Optional[str], serial: Optional[str], existing: object | None
-) -> bool:
-    """Whether registration should put this screen under VNNOX monitoring.
-
-    Registration is idempotent and re-runs on every reinstall, so an EXISTING
-    link always wins: the CMS is the authority once a screen is in the field,
-    and a reinstall must not silently revert a correction made there.
-
-    A serial with no answer is not enough. Detection never opens this gate — at
-    registration or anywhere else.
+    `p` is OMITTED rather than written as null when no keyword was chosen, so a
+    build produced before this field existed and one produced without a choice
+    are byte-identical. Old readers ignore unknown keys; new readers treat a
+    missing `p` as "not stated".
     """
-    if existing is not None:
-        return False
-    return kind == "novastar"
+    payload: dict[str, object] = {
+        "v": PAYLOAD_VERSION,
+        "k": enrollment_key,
+        "o": owner_id,
+    }
+    if player_kind:
+        payload["p"] = player_kind
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def parse_payload(raw: bytes) -> dict[str, str | None]:
+    """Read a stamp back. Every malformed field reads as absent, never raises:
+    this data comes off a file sitting on a box in a venue."""
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {"key": None, "owner_id": None, "player_kind": None}
+    if not isinstance(payload, dict):
+        return {"key": None, "owner_id": None, "player_kind": None}
+
+    def _str(name: str) -> str | None:
+        value = payload.get(name)
+        return value if isinstance(value, str) and value else None
+
+    return {
+        "key": _str("k"),
+        "owner_id": _str("o"),
+        "player_kind": _str("p"),
+    }
 ```
 
-And in the register handler, after the screen row exists:
+Then have `inject_key` take `player_kind` and call `build_payload`, and have the existing reader use `parse_payload(...)["key"]` so there is one parser.
+
+- [ ] **Step 4: Vary the personalised download by keyword**
+
+In `app/apk/service.py`, the cached object path is keyed by owner and version. Add the keyword, so the two variants do not overwrite each other:
+
+```python
+def personalized_object_path(
+    owner_id: str, version_code: int, player_kind: str = "andbox"
+) -> str:
+    # The keyword is part of the identity of the file, not metadata about it:
+    # two owners' builds already differ, and now an owner's AndBox and NovaStar
+    # builds differ too. Sharing one path would serve whichever was stamped last.
+    return f"apk/personalized/{owner_id}/{version_code}/{player_kind}/player.apk"
+```
+
+Pass the chosen keyword through the download route to `inject_key`.
+
+- [ ] **Step 5: Read it on the box and send it at registration**
+
+In `EmbeddedKey.kt`, alongside the existing key read, expose the keyword from the same JSON object:
+
+```kotlin
+    /** The player keyword the CMS stamped in, or null on an unstamped build.
+     *
+     *  Read from the same block as the enrollment key — one stamp, two fields —
+     *  so a download either carries both or neither. */
+    fun playerKind(context: Context): String? = readPayload(context)
+        ?.get("p")?.jsonPrimitive?.contentOrNull
+```
+
+In `Enrollment.kt`, pass it into `RegisterRequest`:
+
+```kotlin
+    playerKind = EmbeddedKey.playerKind(context),
+```
+
+And add the field to `RegisterDto.kt`:
+
+```kotlin
+    // Which telemetry adapter serves this screen, stamped into the APK by the
+    // CMS at download time. Null on an unstamped build (a dev build, or the raw
+    // CI artifact) — the backend then leaves the screen on its default keyword.
+    @SerialName("player_kind") val playerKind: String? = null,
+```
+
+- [ ] **Step 6: Apply it at registration**
+
+In `app/screens/schemas.py` add `player_kind: Optional[str] = None` to the register request, and in the register handler:
 
 ```python
     from app.health import link_service
+    from app.health.vendors.registry import vendor_for
 
-    # The keyword the installer's choice produced is the whole trigger. Anything
-    # other than "novastar" — including "andbox" and no answer at all —
-    # leaves this screen out of the VNNOX poll entirely.
-    existing = await link_service.get_link(db, screen.id)
-    if should_create_link_on_register(
-        kind=payload.player_kind,
-        serial=payload.controller_serial,
-        existing=existing,
-    ):
-        await link_service.set_player_kind(
-            db, screen.id, "novastar", payload.controller_serial
-        )
-
-    # Detection is recorded separately and cannot open the gate. The vendor here
-    # comes from the device profile the APK sniffed, NOT from the answer above —
-    # keeping them distinct is what lets the CMS say "this looks like a NovaStar
-    # but nobody enabled monitoring".
-    await link_service.record_detected_controller(
-        db,
-        screen,
-        payload.device_info.get("controller_vendor"),
-        payload.controller_serial,
-    )
+    # Registration SETS the keyword but never overwrites one. Register is
+    # idempotent and re-runs on every reinstall and factory reset; without this
+    # rule, reinstalling a box would silently revert a CMS correction.
+    stamped = (payload.player_kind or "").strip().lower()
+    if stamped and screen.player_kind == "andbox" and stamped != "andbox":
+        await link_service.set_player_kind(db, screen.id, stamped, None)
+        if vendor_for(stamped) is not None:
+            logger.info(
+                "Screen %s registered as %s from its stamped APK", screen.id, stamped
+            )
 ```
 
-- [ ] **Step 6: Verify**
+A `novastar` screen therefore arrives linked but with no serial yet — visible in the CMS as "set to NovaStar, no VNNOX serial", which is an honest state and exactly what the operator needs to finish.
+
+- [ ] **Step 7: Offer the choice on the CMS download page**
+
+Two buttons rather than one, labelled from `PLAYER_KINDS` so a future integration adds itself:
+
+```tsx
+{Object.entries(PLAYER_KINDS).map(([kind, meta]) => (
+  <Button key={kind} onClick={() => download(kind)}>
+    Download for {meta.label}
+  </Button>
+))}
+```
+
+- [ ] **Step 8: Verify**
 
 ```bash
-cd markai-signage-api && poetry run ruff check app/screens app/health
+cd markai-signage-api
 poetry run python -c "
-from app.screens.service import should_create_link_on_register as f
-assert f(kind='novastar', serial='X', existing=None) is True
-assert f(kind='novastar', serial='X', existing=object()) is False
-assert f(kind=None, serial='X', existing=None) is False
-print('register gate ok')
+from app.apk.signing_block import build_payload, parse_payload
+import json
+assert json.loads(build_payload('K','o','novastar'))['p'] == 'novastar'
+assert 'p' not in json.loads(build_payload('K','o',None))
+assert parse_payload(build_payload('K','o','novastar'))['player_kind'] == 'novastar'
+assert parse_payload(json.dumps({'v':1,'k':'K','o':'o'}).encode())['player_kind'] is None
+print('stamp ok')
 "
+poetry run ruff check app/apk app/screens
 cd ../markai-player-apk && ./gradlew :app:compileDebugKotlin
 ```
-Expected: `register gate ok`, then `BUILD SUCCESSFUL`.
+Expected: `stamp ok`, no ruff output, `BUILD SUCCESSFUL`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git commit -am "feat(health): ask the installer whether the box is a NovaStar"
+git commit -am "feat(apk): stamp the player keyword into the personalised download"
 ```
-
----
 
 ## Task 10: CMS — the player-keyword picker, badge, and corrected tier copy
 
