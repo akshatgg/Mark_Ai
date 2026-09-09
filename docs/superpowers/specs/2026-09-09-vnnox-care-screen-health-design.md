@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-09
 **Surface:** `markai-Web-cms` → `/screen-health` (existing pages, extended)
-**Backends touched:** `markai-signage-api` (new vendor adapter + sync), `markai-player-apk` (reports controller serial)
+**Backends touched:** `markai-signage-api` (vendor registry, adapter, sync), `markai-player-apk` (asks the installer for the player keyword, reports the box serial)
 **Status:** design approved 2026-09-09; blocked on an account fix before it can be verified against real hardware
 
 ## Problem
@@ -377,8 +377,8 @@ VNNOX's own Alarm History column exactly.
 
 `app/health/vendors/vnnox/`:
 
-* `client.py` — signed HTTP client; paces under 5/sec; honours `Retry-After` on 429
-  rather than a fixed backoff.
+* `client.py` — signed HTTP client; paces at 12/sec, under the documented 15;
+  honours `Retry-After` on a 429 rather than a fixed backoff.
 * `position.py` — the decoder above. Pure functions, no I/O.
 * `adapter.py` — VNNOX JSON → the four tables. One function per subsystem.
 * `sync.py` — selects linked screens, batches by 10, calls `/all`, writes.
@@ -469,12 +469,32 @@ agent (`ruff` is the gate; the user runs the suite).
 | Dead cabinet drops out of `monitor` rather than flagging false | Adapter treats absent and `false` identically |
 | Phase A/B stranded 49 commits behind `main` | Rebase first, as its own step; migration slot `0038` is free |
 | Camera endpoints unverified (500s) | Out of scope for v1 |
+| Alarm endpoint may be current-only, so history starts empty | Settled by one call on Saturday; the wall has 48 historical and 0 active alarms, so an empty response proves current-only |
+| Existing AndBox screen must be unaffected | `andbox` backfill, no enrollment prompt on an upgraded box, byte-identical heartbeat |
 
 ## Phasing
 
-1. Rebase the Phase A/B health work from `dev` onto `main` in all three repos.
-2. Backend: client, position decoder, adapter, sync, cron, link table.
-3. APK: report `ro.serialno` in the heartbeat when running on a NovaStar box.
-4. CMS: extend the health pages to full parity.
-5. Saturday: verify against the real controller; confirm the serial matches and how
-   a dead cabinet actually presents.
+The implementation plan is
+`docs/superpowers/plans/2026-09-09-vnnox-care-screen-health.md` — 17 tasks.
+
+1. Land the Phase A/B health work on `main` in all three repos.
+2. Backend: position decoder → client → keyword + tables → fixtures → adapter →
+   registry → sync + cron → keyword service and endpoints.
+3. APK: report the box serial; ask the installer for the keyword at enrollment.
+4. CMS: keyword picker, the Screens-section tag, cabinet grid tabs, alarm
+   history, brightness history.
+5. Configure, then verify against the real controller on Saturday.
+
+## Open decisions
+
+* **Reading history.** `panel_readings` is latest-only, so temperature and
+  voltage show the current value and yesterday's is lost. Faults keep their
+  intervals, so "dark since Tuesday" already works. Storing a reading history
+  would give the one genuinely predictive signal — a cabinet drifting hot for
+  weeks before it fails — and unrecorded history cannot be recovered later.
+  Recommended: append from day one, hourly rollup after 7 days. **Not decided.**
+* **A "Refresh now" button.** One request covers 10 screens, so it is affordable
+  with a per-screen throttle. **Not decided.**
+* **Poll interval.** 5 minutes. A fault that opens and clears inside one window
+  is never seen; the budget would allow 1 minute. Revisit once Saturday shows how
+  often VNNOX's own `reportTime` actually advances.
