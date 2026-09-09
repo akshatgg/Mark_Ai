@@ -202,6 +202,34 @@ flat out at 15/sec would spend the whole hourly budget in 100 seconds. The
 sustainable rate is one request every 2.4 seconds; the 5-minute cycle uses a tiny
 fraction of that (12 requests/hour for two screens).
 
+### There is no alarm-history endpoint
+
+`brightness/history` is the only historical endpoint in VNNOX Care. Every alarm
+route returns **currently active** alarms only, and three of the four
+(`receivingCard`, `masterControl`, `smartModule`) already ride inside `POST /all`
+— so alarms cost no extra request. `monitor-card/alarm` is the exception, and is
+only relevant on walls with monitoring cards fitted.
+
+**Our Alarm History is therefore ours to build, and starts empty.** The console
+shows 48 rows going back to June because NovaStar's own database has been
+recording since the device was bound; that archive is not reachable through the
+API and cannot be imported.
+
+`panel_health` already models exactly this: a fault opens when it first appears
+in a poll and is stamped `resolved_at` when it stops appearing, which is the same
+open→"Recover" lifecycle their console renders. From the first poll onward our
+history is arguably better shaped than theirs — intervals rather than events,
+queryable, and joinable to bookings for "was this cabinet dark while that
+campaign ran".
+
+Two consequences to expect rather than debug:
+
+* **Day one shows an empty history** even though VNNOX's console is full.
+* **A fault that opens and clears between two polls is never seen.** This, not
+  the rate limit, is the real cost of the polling interval. At 1500 requests/hour
+  a 1-minute cadence costs 60/hour and remains comfortable, so the interval is a
+  product decision, not a budget one.
+
 ### The blocker
 
 The API key's account is `akshatgg` (org admin, no sub-users, zero devices). The
