@@ -8,6 +8,29 @@
 
 **Tech Stack:** FastAPI + SQLAlchemy async + Alembic (`markai-signage-api`), Next.js App Router + Tailwind (`markai-Web-cms`), Kotlin (`markai-player-apk`), Postgres.
 
+## Non-negotiable: the existing fleet must not change behaviour
+
+Production today is a single **AndBox** screen, and it must keep working exactly
+as it does now after this ships. Four properties deliver that, and each is a
+thing to verify rather than assume:
+
+1. **The migration backfills every existing screen to `andbox`**
+   (`server_default="andbox"`), which has no registered adapter. The cron's query
+   returns an empty list, so VNNOX is never called for any current screen.
+2. **The running box never sees the new install question.** First-launch
+   enrollment only runs when the box holds no credentials; an already-enrolled
+   screen skips it entirely on upgrade. No reinstall, no re-registration.
+3. **The heartbeat body stays byte-identical.** The new fields are optional and
+   the APK serialises with `explicitNulls = false`, so a player with nothing to
+   report sends exactly the bytes it sends today.
+4. **Detection cannot enable anything.** The updated APK reports the AndBox's
+   `ro.serialno` into informational columns. Even a wrong detection cannot put a
+   screen into the poll, because only `player_kind` does that and only a person
+   sets it.
+
+Anything in this plan that would change what the AndBox screen does is a bug in
+the plan.
+
 ## Global Constraints
 
 - **Do not run `pytest`.** Project convention: the agent verifies with `ruff check` and import checks; the user runs the suite. Write the tests, never execute them.
