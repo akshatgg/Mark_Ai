@@ -33,15 +33,31 @@ program, real-time-control and scheduled-control APIs are off limits — they
 duplicate functionality that already exists and works, and calling them would
 create two sources of truth for the same screen.
 
-## Governing constraint: no link, no call
+## Governing constraint: the operator chooses, nothing is inferred
 
 Not every screen has a NovaStar. Some run the plain AndBox player, which has no
 controller telemetry at all. Calling VNNOX for those screens would produce a
 guaranteed error on every poll.
 
-The gate is a **row in a table, not a heuristic**. A screen with no
-`screen_vnnox_link` row is never included in a batch, so a non-VNNOX screen cannot
-error because it is never the subject of a request.
+The gate is **an explicit choice on the screen form**, stored as a row:
+
+> **Panel monitoring**
+> ( ) Our media player only — no panel telemetry
+> (•) NovaStar controller + VNNOX Care → *VNNOX serial:* `[____________]`
+
+A screen with no `screen_vnnox_link` row is never in a batch, and that row is
+created **only** by an operator picking the second option.
+
+An earlier draft made this automatic: the APK would report the box's serial and
+the backend would create the link. That was rejected. Detecting "this is a
+NovaStar" means substring-matching `Build.MANUFACTURER` for `nova`, and a false
+positive there would call VNNOX for a screen that has none — precisely the
+failure this constraint exists to prevent. A human ticking a box cannot be
+wrong in that direction, and works before the APK is upgraded.
+
+The APK's detected serial is kept as a **prefill suggestion** on the form, never
+as a trigger. Vendor detection survives only as a hint shown to the operator
+("this box looks like a NovaStar — enable panel monitoring?"), never as a gate.
 
 ## Verified against the live API (2026-09-09)
 
@@ -129,14 +145,27 @@ already carries 60+.
 |---|---|
 | `screen_id` | unique FK |
 | `vendor` | `novastar` |
-| `controller_serial` | what the APK reported (`ro.serialno`) |
-| `vnnox_sn` | what we actually poll; defaults to `controller_serial`, superadmin-overridable |
+| `vnnox_sn` | the SN we poll — set by the operator, prefilled from the detected serial |
 | `vnnox_sid` | VNNOX's numeric screen id, cached from `screen/list` |
 | `last_sync_at`, `last_error` | sync bookkeeping, surfaced in the CMS |
 
-`vnnox_sn` is separate from `controller_serial` because we do not yet know that the
-Taurus's Android serial equals VNNOX's SN. If they differ, an operator sets the
-override and nothing else changes.
+**The row's existence is the gate.** It is created only when an operator selects
+NovaStar + VNNOX Care on the screen form, and deleted when they switch back.
+
+### New: two columns on `screens`
+
+| Column | Purpose |
+|---|---|
+| `controller_serial` | `ro.serialno` as read by the APK — informational |
+| `controller_vendor` | `novastar` when the box's build properties suggest it |
+
+These are **detection output, never a gate**. They exist so the form can prefill
+the serial and suggest enabling monitoring. A screen can carry both and still
+never be polled, because the operator did not tick the box.
+
+`vnnox_sn` is stored separately from `screens.controller_serial` because we do not
+yet know that a Taurus's Android serial equals the SN VNNOX indexes it by. If they
+differ, the operator edits one field and nothing else changes.
 
 ## Field mapping
 
@@ -289,7 +318,7 @@ agent (`ruff` is the gate; the user runs the suite).
 | Risk | Mitigation |
 |---|---|
 | Account mismatch — key cannot see the screens | Must be fixed externally; nothing verifies until then |
-| Taurus `ro.serialno` ≠ VNNOX SN | `vnnox_sn` override field; costs one form input |
+| Taurus `ro.serialno` ≠ VNNOX SN | Operator types the SN on the form; detection is only a prefill |
 | Dead cabinet drops out of `monitor` rather than flagging false | Adapter treats absent and `false` identically |
 | Phase A/B stranded 49 commits behind `main` | Rebase first, as its own step; migration slot `0038` is free |
 | Camera endpoints unverified (500s) | Out of scope for v1 |
