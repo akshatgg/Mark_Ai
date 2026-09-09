@@ -16,7 +16,8 @@
 - **Only `/v2/device-status-monitor/*` endpoints may be called.** VNNOX's player, program, real-time-control and scheduled-control APIs are out of bounds — our backend already owns scheduling and playback.
 - **`POST /v2/device-status-monitor/all` is the only endpoint used on a polling cycle.** Rate limit is 5/sec and 1000/hour account-wide; per-endpoint polling caps the fleet at ~5 screens.
 - **`unknown` is never rendered as `ok`.** A screen VNNOX did not answer for has grey cabinets, not green.
-- **The VNNOX gate is an operator's explicit choice, never inference.** A `screen_vnnox_link` row is created only when someone selects "NovaStar controller + VNNOX Care" on the screen form. Serial detection by the APK is a prefill suggestion and must never create a link by itself.
+- **The gate is a KEYWORD, never a boolean and never inference.** `screens.player_kind` (`andbox`, `novastar`, …) selects a telemetry adapter from a registry. More media players are coming, each with its own API, so anything that reduces this to on/off is wrong. `andbox` is not special-cased — it simply has no registered adapter.
+- **Only a person sets the keyword** — the installer at enrollment, or an operator in the CMS. Serial/vendor detection by the APK is a prefill suggestion and must never set it.
 - Base URL `https://open-in.vnnox.com` (IN node).
 - Backend mirrors the `vm-api` layout: per-domain `router.py` / `schemas.py` / `service.py` / `models.py`.
 
@@ -629,7 +630,7 @@ git commit -m "feat(health): signed VNNOX client with rate-limit pacing"
 
 ---
 
-## Task 4: `screen_vnnox_link` — the gate
+## Task 4: `player_kind` keyword + the NovaStar adapter's config table
 
 **Files:**
 - Create: `app/health/link_models.py`, `alembic/versions/0065_screen_vnnox_link.py`
@@ -637,7 +638,7 @@ git commit -m "feat(health): signed VNNOX client with rate-limit pacing"
 - Test: `tests/test_vnnox_link.py`
 
 **Interfaces:**
-- Produces: `ScreenVnnoxLink` with columns `id, screen_id, vendor, vnnox_sn, vnnox_sid, last_sync_at, last_error, created_at, updated_at`; new `screens.controller_serial` and `screens.controller_vendor` columns.
+- Produces: `screens.player_kind` (the gate keyword, default `andbox`), `screens.controller_serial`, `screens.controller_vendor`; `ScreenVnnoxLink` with `id, screen_id, vnnox_sn, vnnox_sid, last_sync_at, last_error, created_at, updated_at`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -687,19 +688,16 @@ poetry run python -m py_compile tests/test_vnnox_link.py && poetry run ruff chec
 
 ```python
 # app/health/link_models.py
-"""Which screens an operator has put under VNNOX Care monitoring.
+"""The NovaStar adapter's per-screen configuration.
 
-This table is the gate for the whole VNNOX integration. Not every screen has a
-NovaStar — some run the plain AndBox player, which has no controller telemetry
-at all — and calling VNNOX for those would produce a guaranteed error on every
-poll.
+This is NOT the gate — `screens.player_kind` is. This table holds what the VNNOX
+Care adapter specifically needs in order to poll: the serial number VNNOX indexes
+the device by, and the bookkeeping from the last sync.
 
-The row is created ONLY by an operator selecting "NovaStar controller + VNNOX
-Care" on the screen form. It is deliberately not created from detection: knowing
-a box is a NovaStar means substring-matching its build properties, and a false
-positive there would poll VNNOX for a screen that has none — the exact failure
-this table exists to prevent. `screens.controller_serial` holds what the APK
-detected, and is used only to prefill the form.
+Kept as its own table rather than columns on `screens` because it is vendor
+private. A second integration (Colorlight, Linsn, …) has no `vnnox_sn` and gets
+its own table, instead of widening this one into a sheet of mostly-null columns
+where each vendor ignores the others' fields.
 """
 
 from __future__ import annotations
@@ -841,8 +839,20 @@ def upgrade() -> None:
         "ix_screen_vnnox_link_sn", "screen_vnnox_link", ["vnnox_sn"]
     )
 
+    # THE GATE. A keyword rather than a boolean because each future media player
+    # brings its own telemetry API, so the question is "which adapter" and never
+    # "on or off". Existing rows default to `andbox`, which has no adapter and is
+    # therefore never polled — the safe direction for a backfill.
+    op.add_column(
+        "screens",
+        sa.Column(
+            "player_kind", sa.String(32), nullable=False, server_default="andbox"
+        ),
+    )
+    op.create_index("ix_screens_player_kind", "screens", ["player_kind"])
+
     # Detection output, never a gate: what the APK saw on the box it runs on.
-    # Used only to prefill the screen form and to suggest enabling monitoring.
+    # Used only to prefill the screen form and to suggest a keyword.
     op.add_column(
         "screens", sa.Column("controller_serial", sa.String(128), nullable=True)
     )
@@ -854,6 +864,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column("screens", "controller_vendor")
     op.drop_column("screens", "controller_serial")
+    op.drop_index("ix_screens_player_kind", table_name="screens")
+    op.drop_column("screens", "player_kind")
     op.drop_index("ix_screen_vnnox_link_sn", table_name="screen_vnnox_link")
     op.drop_constraint(
         "uq_screen_vnnox_link_screen", "screen_vnnox_link", type_="unique"
@@ -866,9 +878,16 @@ def downgrade() -> None:
 In `app/screens/models.py`, beside the other device-profile columns (`model`, `manufacturer`, `android_version` around line 86):
 
 ```python
-    # What the APK detected about the box it runs on. Informational ONLY: the
-    # decision to poll VNNOX is an operator's, recorded in screen_vnnox_link.
-    # A screen can carry both of these and never be polled.
+    # THE GATE: which telemetry adapter this screen uses. "andbox" (our own media
+    # player) has no adapter registered, so it is never polled. See
+    # app/health/vendors/registry.py.
+    player_kind: Mapped[str] = mapped_column(
+        String(32), default="andbox", server_default="andbox", nullable=False
+    )
+
+    # What the APK detected about the box it runs on. Informational ONLY — a
+    # screen can carry both of these and never be polled, because detection does
+    # not set player_kind. A person does.
     controller_serial: Mapped[str | None] = mapped_column(String(128), nullable=True)
     controller_vendor: Mapped[str | None] = mapped_column(String(32), nullable=True)
 ```
@@ -1546,6 +1565,183 @@ git commit -m "feat(health): map VNNOX Care payloads onto HealthReport"
 
 ---
 
+## Task 6b: The adapter registry
+
+The keyword is only useful if something dispatches on it. This is the seam every future media-player integration plugs into, so it exists from the start with one entry rather than being retrofitted when the second vendor arrives.
+
+**Files:**
+- Create: `app/health/vendors/registry.py`
+- Test: `tests/test_health_vendor_registry.py`
+
+**Interfaces:**
+- Produces:
+  - `class HealthVendor(Protocol)` with `key: str` and `async def poll(db, links) -> VendorSummary`
+  - `def vendor_for(player_kind: str | None) -> HealthVendor | None`
+  - `def monitored_kinds() -> list[str]`
+  - `HEALTH_ADAPTERS: dict[str, HealthVendor]`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_health_vendor_registry.py
+"""Keyword → telemetry adapter.
+
+The registry exists because `player_kind` is a keyword rather than a boolean:
+more media players are planned and each has its own API, so the question a screen
+answers is "which vendor do I call", not "am I monitored".
+"""
+
+from app.health.vendors.registry import monitored_kinds, vendor_for
+
+
+def test_novastar_resolves_to_an_adapter():
+    assert vendor_for("novastar") is not None
+
+
+def test_andbox_has_no_adapter():
+    """Our own media player is not special-cased anywhere. It simply has no
+    entry, which is why nothing is ever called for it."""
+    assert vendor_for("andbox") is None
+
+
+def test_an_unknown_keyword_resolves_to_nothing():
+    """A keyword from a newer APK than this backend must be inert, not a crash.
+    Rolling the APK out ahead of the backend has to be safe."""
+    assert vendor_for("colorlight") is None
+
+
+def test_none_and_empty_resolve_to_nothing():
+    assert vendor_for(None) is None
+    assert vendor_for("") is None
+
+
+def test_lookup_is_case_insensitive():
+    assert vendor_for("NovaStar") is not None
+
+
+def test_monitored_kinds_lists_only_keywords_with_adapters():
+    kinds = monitored_kinds()
+    assert "novastar" in kinds
+    assert "andbox" not in kinds
+```
+
+- [ ] **Step 2: Verify the test is valid**
+
+```bash
+poetry run python -m py_compile tests/test_health_vendor_registry.py && poetry run ruff check tests/test_health_vendor_registry.py
+```
+
+- [ ] **Step 3: Write the registry**
+
+```python
+# app/health/vendors/registry.py
+"""Which telemetry adapter serves which player keyword.
+
+`screens.player_kind` is a keyword, not a boolean, because every media player we
+integrate brings its own telemetry API. A screen therefore answers "which vendor
+do I call", and this module is where that question is resolved.
+
+Adding an integration is: write an adapter, add one line below. Nothing that
+already works changes, and no screen is touched.
+
+Our own media player (`andbox`) is deliberately absent rather than mapped to a
+null adapter. "Not in the registry" is the same code path as "a keyword this
+backend has never heard of", which is what makes it safe to roll an APK that
+sends a new keyword out ahead of the backend that understands it.
+"""
+
+from __future__ import annotations
+
+from typing import Optional, Protocol, Sequence
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class HealthVendor(Protocol):
+    """One vendor's panel telemetry."""
+
+    key: str
+
+    async def poll(self, db: AsyncSession, links: Sequence[object]) -> object:
+        """Fetch and persist health for the given screens."""
+        ...
+
+
+def _build_registry() -> dict[str, HealthVendor]:
+    # Imported here rather than at module scope so the registry can be read by
+    # config/tooling without pulling in httpx and the whole client stack.
+    from app.health.vendors.vnnox.vendor import VnnoxCareVendor
+
+    return {"novastar": VnnoxCareVendor()}
+
+
+HEALTH_ADAPTERS: dict[str, HealthVendor] = _build_registry()
+
+
+def vendor_for(player_kind: Optional[str]) -> Optional[HealthVendor]:
+    """The adapter for a keyword, or None if there is none.
+
+    None is a normal answer, not an error: it covers our own media player and any
+    keyword newer than this backend.
+    """
+    return HEALTH_ADAPTERS.get((player_kind or "").strip().lower())
+
+
+def monitored_kinds() -> list[str]:
+    """Keywords that actually cause a call. The sync selects on exactly this."""
+    return sorted(HEALTH_ADAPTERS)
+```
+
+- [ ] **Step 4: Write the NovaStar vendor wrapper**
+
+```python
+# app/health/vendors/vnnox/vendor.py
+"""The VNNOX Care adapter, as the registry sees it.
+
+A thin object over `sync.poll_links` so the registry has something uniform to
+call. The vendor-specific work stays in sync.py / adapter.py.
+"""
+
+from __future__ import annotations
+
+from typing import Sequence
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class VnnoxCareVendor:
+    key = "novastar"
+    label = "NovaStar"
+
+    async def poll(self, db: AsyncSession, links: Sequence[object]):
+        from app.health.vendors.vnnox.sync import poll_links
+
+        return await poll_links(db, links)
+```
+
+- [ ] **Step 5: Verify**
+
+```bash
+poetry run python -c "
+from app.health.vendors.registry import vendor_for, monitored_kinds
+assert vendor_for('NovaStar') is not None
+assert vendor_for('andbox') is None
+assert vendor_for('colorlight') is None
+print('registry ok', monitored_kinds())
+"
+poetry run ruff check app/health/vendors
+```
+Expected: `registry ok ['novastar']`, no ruff output.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/health/vendors/registry.py app/health/vendors/vnnox/vendor.py tests/test_health_vendor_registry.py
+git commit -m "feat(health): keyword-to-adapter registry for panel telemetry"
+```
+
+---
+
 ## Task 7: `sync.py` + cron route
 
 **Files:**
@@ -1554,9 +1750,10 @@ git commit -m "feat(health): map VNNOX Care payloads onto HealthReport"
 - Test: `tests/test_vnnox_sync.py`
 
 **Interfaces:**
-- Consumes: `VnnoxClient`, `VnnoxError` (Task 3); `ScreenVnnoxLink` (Task 4); `build_health_report`, `screen_entries` (Task 6); `record_health` from `app.health.service`.
+- Consumes: `VnnoxClient`, `VnnoxError` (Task 3); `ScreenVnnoxLink` and `Screen.player_kind` (Task 4); `build_health_report`, `screen_entries` (Task 6); `VnnoxCareVendor` (Task 6b); `record_health` from `app.health.service`.
 - Produces:
   - `async def sync_all(db: AsyncSession, client: VnnoxClient | None = None) -> SyncSummary`
+  - `async def poll_links(db, pollable: Sequence[ScreenVnnoxLink], client=None) -> SyncSummary`
   - `class SyncSummary` with `.screens_polled: int`, `.screens_failed: int`, `.batches: int`
   - `BATCH_SIZE = 10`
 
@@ -1634,6 +1831,8 @@ from app.health.schemas import ControllerReport, HealthReport
 from app.health.service import record_health
 from app.health.vendors.vnnox.adapter import build_health_report, screen_entries
 from app.health.vendors.vnnox.client import VnnoxClient, VnnoxError
+from app.health.vendors.vnnox.vendor import VnnoxCareVendor
+from app.screens.models import Screen
 
 logger = logging.getLogger(__name__)
 
@@ -1660,18 +1859,38 @@ class SyncSummary:
 async def sync_all(
     db: AsyncSession, client: Optional[VnnoxClient] = None
 ) -> SyncSummary:
-    """Poll every linked screen. Screens with no link row are never touched."""
+    """Select the screens this vendor owns, then poll them.
+
+    Selection is on the keyword AND the adapter's config row. A screen whose
+    `player_kind` has no registered adapter is not merely skipped here — it is
+    never a candidate, which is why our own media player cannot produce an error
+    on this path.
+    """
+    rows = (
+        (
+            await db.execute(
+                select(ScreenVnnoxLink)
+                .join(Screen, Screen.id == ScreenVnnoxLink.screen_id)
+                .where(Screen.player_kind == VnnoxCareVendor.key)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return await poll_links(db, [link for link in rows if link.pollable], client)
+
+
+async def poll_links(
+    db: AsyncSession,
+    pollable: Sequence[ScreenVnnoxLink],
+    client: Optional[VnnoxClient] = None,
+) -> SyncSummary:
+    """Poll a specific set of already-selected links. The registry's entry point."""
     summary = SyncSummary()
     client = client or VnnoxClient()
     if not client.configured:
         logger.info("vnnox: no credentials configured, skipping sync")
         return summary
-
-    # Only linked screens are ever loaded. A screen with no row is not merely
-    # skipped — it is never a candidate, which is why a non-VNNOX screen cannot
-    # produce an error here.
-    links = list((await db.execute(select(ScreenVnnoxLink))).scalars().all())
-    pollable = [link for link in links if link.pollable]
     if not pollable:
         return summary
 
@@ -1823,7 +2042,7 @@ git commit -m "feat(health): poll VNNOX Care on a cron and persist per-cabinet s
 
 ---
 
-## Task 8: Monitoring source — the operator's choice, plus heartbeat detection
+## Task 8: Setting the keyword — operator choice, plus heartbeat detection
 
 **Files:**
 - Create: `app/health/link_service.py`
@@ -1835,9 +2054,9 @@ git commit -m "feat(health): poll VNNOX Care on a cron and persist per-cabinet s
 - Produces:
   - `def clean_serial(serial: str | None) -> str | None`
   - `async def record_detected_controller(db, screen: Screen, vendor: str | None, serial: str | None) -> None`
-  - `async def set_monitoring(db, screen_id: str, enabled: bool, vnnox_sn: str | None) -> ScreenVnnoxLink | None`
+  - `async def set_player_kind(db, screen_id: str, player_kind: str, vnnox_sn: str | None) -> ScreenVnnoxLink | None`
   - `async def get_link(db, screen_id: str) -> ScreenVnnoxLink | None`
-  - Response schema `VnnoxLinkView` with `enabled, vendor, vnnox_sn, effective_sn, detected_serial, detected_vendor, last_sync_at, last_error`
+  - Response schema `PlayerKindView` with `player_kind, monitored, vnnox_sn, effective_sn, detected_serial, detected_vendor, last_sync_at, last_error`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1897,9 +2116,9 @@ poetry run python -m py_compile tests/test_vnnox_link_service.py && poetry run r
 
 Two jobs that must not be merged:
 
-**The choice.** `set_monitoring` creates or removes the `screen_vnnox_link` row
-in response to an operator picking "NovaStar controller + VNNOX Care" on the
-screen form. This is the only thing that can put a screen into the poll.
+**The choice.** `set_player_kind` writes `screens.player_kind` — the keyword that
+selects a telemetry adapter — and creates or removes that adapter's config row.
+This is the only thing that can put a screen into a poll.
 
 **The detection.** `record_detected_controller` stores what the APK saw on the
 box it is running on. It writes to `screens`, never to the link, and therefore
@@ -1964,24 +2183,33 @@ async def record_detected_controller(
         screen.controller_vendor = vendor
 
 
-async def set_monitoring(
-    db: AsyncSession, screen_id: str, enabled: bool, vnnox_sn: Optional[str]
+async def set_player_kind(
+    db: AsyncSession, screen_id: str, player_kind: str, vnnox_sn: Optional[str]
 ) -> Optional[ScreenVnnoxLink]:
-    """Turn VNNOX Care monitoring on or off for one screen.
+    """Set a screen's player keyword, and its adapter config if it has one.
 
-    Turning it off DELETES the row rather than flagging it, so "is this screen
-    polled" has exactly one answer and cannot drift between a boolean and the
-    presence of a row.
+    Switching AWAY from a vendor deletes that vendor's config row rather than
+    leaving it orphaned, so "is this screen polled by X" has exactly one answer
+    and cannot drift between the keyword and a stale row.
+
+    Unknown keywords are accepted and stored. A keyword this backend has no
+    adapter for is inert, which is what makes it safe to roll out an APK that
+    knows about a new player before the backend that polls it.
     """
+    screen = (
+        await db.execute(select(Screen).where(Screen.id == screen_id))
+    ).scalar_one()
+    screen.player_kind = (player_kind or "andbox").strip().lower()
+
     link = await get_link(db, screen_id)
 
-    if not enabled:
+    if screen.player_kind != "novastar":
         if link is not None:
             await db.delete(link)
         return None
 
     if link is None:
-        link = ScreenVnnoxLink(screen_id=screen_id, vendor="novastar")
+        link = ScreenVnnoxLink(screen_id=screen_id)
         db.add(link)
     link.vnnox_sn = clean_serial(vnnox_sn)
     link.last_error = None
@@ -2021,16 +2249,17 @@ In the heartbeat handler in `app/playback/service.py`, after the screen row is l
 In `app/health/schemas.py`:
 
 ```python
-class VnnoxLinkView(BaseModel):
-    """A screen's panel-monitoring setting as the CMS shows it.
+class PlayerKindView(BaseModel):
+    """A screen's player keyword as the CMS shows it.
 
-    `enabled` is the operator's choice. `detected_*` is what the APK saw and is
-    only ever a suggestion — a screen can have a detected NovaStar serial and
-    still be disabled, which is a legitimate state, not an inconsistency.
+    `monitored` is DERIVED from whether the keyword has a registered adapter —
+    it is never stored, so it cannot disagree with the registry. `detected_*` is
+    what the APK saw and is only ever a suggestion: a screen can have a detected
+    NovaStar serial and still be `andbox`, which is a legitimate state.
     """
 
-    enabled: bool
-    vendor: str = "novastar"
+    player_kind: str
+    monitored: bool
     vnnox_sn: Optional[str] = None
     effective_sn: Optional[str] = None
     detected_serial: Optional[str] = None
@@ -2039,20 +2268,25 @@ class VnnoxLinkView(BaseModel):
     last_error: Optional[str] = None
 
 
-class SetVnnoxLinkRequest(BaseModel):
-    """`enabled=False` removes monitoring entirely; `vnnox_sn` is ignored then."""
+class SetPlayerKindRequest(BaseModel):
+    """Any keyword is accepted; one with no adapter is simply inert.
 
-    enabled: bool
+    `vnnox_sn` applies only to `novastar` and is ignored for anything else.
+    """
+
+    player_kind: str
     vnnox_sn: Optional[str] = None
 ```
 
 In `app/health/router.py`:
 
 ```python
-def _link_view(screen: Screen, link: ScreenVnnoxLink | None) -> VnnoxLinkView:
-    return VnnoxLinkView(
-        enabled=link is not None,
-        vendor=link.vendor if link else "novastar",
+def _kind_view(screen: Screen, link: ScreenVnnoxLink | None) -> PlayerKindView:
+    return PlayerKindView(
+        player_kind=screen.player_kind,
+        # Derived from the registry, never stored — so a keyword whose adapter is
+        # removed stops claiming to be monitored without a data migration.
+        monitored=vendor_for(screen.player_kind) is not None,
         vnnox_sn=link.vnnox_sn if link else None,
         effective_sn=link.effective_sn if link else None,
         detected_serial=screen.controller_serial,
@@ -2062,30 +2296,30 @@ def _link_view(screen: Screen, link: ScreenVnnoxLink | None) -> VnnoxLinkView:
     )
 
 
-@router.get("/{screen_id}/vnnox-link", response_model=VnnoxLinkView)
-async def get_vnnox_link(
+@router.get("/{screen_id}/player-kind", response_model=PlayerKindView)
+async def get_player_kind(
     screen_id: str,
     actor: CmsUser = Depends(require_screenowner_or_super),
     db: AsyncSession = Depends(get_db),
 ):
-    """Always returns a view, even when monitoring is off — the form needs the
-    detected serial in order to offer it as a suggestion."""
+    """Always returns a view, even for `andbox` — the form needs the detected
+    serial in order to offer it as a suggestion."""
     await assert_can_manage_screen(db, actor, screen_id)
     screen = await _load_screen(db, actor, screen_id)
-    return _link_view(screen, await link_service.get_link(db, screen_id))
+    return _kind_view(screen, await link_service.get_link(db, screen_id))
 
 
-@router.put("/{screen_id}/vnnox-link", response_model=VnnoxLinkView)
-async def put_vnnox_link(
+@router.put("/{screen_id}/player-kind", response_model=PlayerKindView)
+async def put_player_kind(
     screen_id: str,
-    body: SetVnnoxLinkRequest,
+    body: SetPlayerKindRequest,
     actor: CmsUser = Depends(require_screenowner_or_super),
     db: AsyncSession = Depends(get_db),
 ):
-    """Choose this screen's panel-monitoring source.
+    """Set this screen's player keyword.
 
-    `enabled=True` puts the screen into the VNNOX poll; `False` takes it out.
-    This is the only way a screen ever enters the poll — the APK's detection
+    The keyword selects a telemetry adapter: `novastar` → VNNOX Care, `andbox` →
+    none. This is the only way a screen ever enters a poll — the APK's detection
     cannot do it, because a mis-detected screen would then error on every cycle.
 
     `vnnox_sn` is separate from the detected serial because we do not yet know
@@ -2093,11 +2327,11 @@ async def put_vnnox_link(
     """
     await assert_can_manage_screen(db, actor, screen_id)
     screen = await _load_screen(db, actor, screen_id)
-    link = await link_service.set_monitoring(
-        db, screen_id, body.enabled, body.vnnox_sn
+    link = await link_service.set_player_kind(
+        db, screen_id, body.player_kind, body.vnnox_sn
     )
     await db.commit()
-    return _link_view(screen, link)
+    return _kind_view(screen, link)
 ```
 
 - [ ] **Step 6: Verify**
@@ -2106,7 +2340,7 @@ async def put_vnnox_link(
 poetry run python -c "
 from app.main import app
 paths = [r.path for r in app.routes]
-assert any('vnnox-link' in p for p in paths), 'link routes missing'
+assert any('player-kind' in p for p in paths), 'player-kind routes missing'
 print('link routes mounted')
 "
 poetry run ruff check app/health app/playback
@@ -2218,8 +2452,8 @@ The installer is physically at the box and knows what it is. That is a better mo
 - Test: `tests/test_vnnox_register_link.py`
 
 **Interfaces:**
-- Consumes: `set_monitoring`, `clean_serial` (Task 8).
-- Produces: `RegisterRequest.controller_kind: String?` (`"media_player"` | `"novastar"`) and `RegisterRequest.controller_serial: String?`.
+- Consumes: `set_player_kind`, `clean_serial` (Task 8).
+- Produces: `RegisterRequest.playerKind: String?` (`"andbox"` | `"novastar"` | future keywords) and `RegisterRequest.controllerSerial: String?`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2242,9 +2476,9 @@ def test_novastar_with_a_serial_creates_a_link():
     ) is True
 
 
-def test_our_media_player_creates_nothing():
+def test_andbox_creates_nothing():
     assert should_create_link_on_register(
-        kind="media_player", serial=None, existing=None
+        kind="andbox", serial=None, existing=None
     ) is False
 
 
@@ -2287,12 +2521,12 @@ poetry run python -m py_compile tests/test_vnnox_register_link.py && poetry run 
 In `RegisterDto.kt`, inside `RegisterRequest`:
 
 ```kotlin
-    // What the installer answered on the first-launch screen: "media_player" or
-    // "novastar". Null on the zero-touch path, which prompts nobody — those
+    // What the installer answered on the first-launch screen: "andbox", "novastar", or a
+    // keyword added later. Null on the zero-touch path, which prompts nobody — those
     // screens arrive unmonitored and are set up in the CMS. This is the ONLY
     // thing that can put a screen into the VNNOX poll at registration; the
     // detected serial below cannot, on its own.
-    @SerialName("controller_kind") val controllerKind: String? = null,
+    @SerialName("player_kind") val playerKind: String? = null,
     // Prefilled from ro.serialno, editable by the installer.
     @SerialName("controller_serial") val controllerSerial: String? = null,
 ```
@@ -2304,7 +2538,7 @@ In `PlayerActivity.kt`, after the enrollment key is accepted and before registra
 Pass the answer through `Enrollment.enroll(...)` into `RegisterRequest`:
 
 ```kotlin
-    controllerKind = if (isNovastar) "novastar" else "media_player",
+    playerKind = if (isNovastar) "novastar" else "andbox",
     controllerSerial = if (isNovastar) enteredSerial.ifBlank { null } else null,
 ```
 
@@ -2318,7 +2552,7 @@ In `app/screens/schemas.py`, on the register request model:
     # The installer's answer on the first-launch screen. None on the zero-touch
     # path. See should_create_link_on_register for why detection alone is not
     # enough to act on.
-    controller_kind: Optional[str] = None
+    player_kind: Optional[str] = None
     controller_serial: Optional[str] = None
 ```
 
@@ -2348,16 +2582,16 @@ And in the register handler, after the screen row exists:
     from app.health import link_service
 
     # The keyword the installer's choice produced is the whole trigger. Anything
-    # other than "novastar" — including "media_player" and no answer at all —
+    # other than "novastar" — including "andbox" and no answer at all —
     # leaves this screen out of the VNNOX poll entirely.
     existing = await link_service.get_link(db, screen.id)
     if should_create_link_on_register(
-        kind=payload.controller_kind,
+        kind=payload.player_kind,
         serial=payload.controller_serial,
         existing=existing,
     ):
-        await link_service.set_monitoring(
-            db, screen.id, True, payload.controller_serial
+        await link_service.set_player_kind(
+            db, screen.id, "novastar", payload.controller_serial
         )
 
     # Detection is recorded separately and cannot open the gate. The vendor here
@@ -2395,29 +2629,30 @@ git commit -am "feat(health): ask the installer whether the box is a NovaStar"
 
 ---
 
-## Task 10: CMS — the monitoring-source selector, badge, and corrected tier copy
+## Task 10: CMS — the player-keyword picker, badge, and corrected tier copy
 
 **Files:**
-- Create: `src/components/screen-health/MonitoringSource.tsx`
+- Create: `src/components/screen-health/PlayerKindPicker.tsx`
 - Modify: `src/lib/types.ts`, `src/app/(dashboard)/screen-health/page.tsx`, `src/app/(dashboard)/screen-health/[id]/page.tsx`, `app/health/capability.py` (backend copy fix)
 
 **Interfaces:**
-- Consumes: `GET /api/cms/screen-health/{id}/vnnox-link` → `VnnoxLinkView` (Task 8).
+- Consumes: `GET /api/cms/screen-health/{id}/player-kind` → `PlayerKindView` (Task 8).
 
 - [ ] **Step 1: Add the type**
 
 In `src/lib/types.ts`:
 
 ```ts
-/** A screen's panel-monitoring setting.
+/** The keyword that selects a screen's telemetry adapter, and what it resolved to.
  *
- *  `enabled: false` means nobody has put this screen under VNNOX Care — NOT
- *  that it is unhealthy. `detected_*` is what the player saw on its box and is
- *  only ever a suggestion; a screen can have a detected NovaStar serial and be
- *  disabled, and that is a legitimate state. */
-export type VnnoxLink = {
-  enabled: boolean;
-  vendor: string;
+ *  `monitored` is derived by the backend from its adapter registry — never
+ *  stored — so the CMS cannot claim a screen is monitored by an adapter that no
+ *  longer exists. `detected_*` is what the player saw on its box and is only ever
+ *  a suggestion: a screen can have a detected NovaStar serial and still be
+ *  `andbox`, and that is a legitimate state, not an inconsistency. */
+export type PlayerKind = {
+  player_kind: string;
+  monitored: boolean;
   vnnox_sn: string | null;
   effective_sn: string | null;
   detected_serial: string | null;
@@ -2425,6 +2660,31 @@ export type VnnoxLink = {
   last_sync_at: string | null;
   last_error: string | null;
 };
+
+/** Keyword → how it is shown. New integrations add a row here and an adapter on
+ *  the backend; nothing else changes. A keyword absent from this map is rendered
+ *  by its raw value rather than hidden, so a screen running a newer APK than this
+ *  CMS still shows something truthful. */
+export const PLAYER_KINDS: Record<
+  string,
+  { label: string; tone: "gray" | "blue"; blurb: string }
+> = {
+  andbox: {
+    label: "AndBox",
+    tone: "gray",
+    blurb: "Our own media player. Playback, screenshots and proof-of-play work as normal; no panel telemetry, because the player cannot see the panel.",
+  },
+  novastar: {
+    label: "NovaStar",
+    tone: "blue",
+    blurb: "NovaStar controller running our APK. Adds cabinet health, temperature, voltage and alarms via VNNOX Care. Scheduling still runs entirely on our own player.",
+  },
+};
+
+export function playerKindLabel(kind: string | null | undefined): string {
+  if (!kind) return "Unknown";
+  return PLAYER_KINDS[kind]?.label ?? kind;
+}
 ```
 
 - [ ] **Step 2: Correct the tier copy**
@@ -2446,47 +2706,51 @@ Make the matching correction in the backend's `app/health/capability.py`, `TIER_
     ),
 ```
 
-- [ ] **Step 3: Build the monitoring-source selector**
+- [ ] **Step 3: Build the player-keyword picker**
 
-Create `src/components/screen-health/MonitoringSource.tsx`. This is the control that decides whether a screen is ever polled, so it states the consequence of each option rather than just naming it.
+Create `src/components/screen-health/PlayerKindPicker.tsx`. This is the control that decides whether a screen is ever polled, so it states the consequence of each option rather than just naming it. It renders from `PLAYER_KINDS`, so adding a future integration is a map entry rather than a new branch.
 
 ```tsx
 "use client";
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import type { VnnoxLink } from "@/lib/types";
+import { PLAYER_KINDS, type PlayerKind } from "@/lib/types";
 import { Button, Card, Input } from "@/components/ui";
 
 /**
- * Which panel-monitoring source a screen uses.
+ * Which player this screen runs, as a keyword.
  *
- * This control IS the gate for the VNNOX integration — a screen is polled if and
- * only if someone chose the second option here. It is a human decision on
- * purpose: detecting a NovaStar from build properties can be wrong, and a false
- * positive would call VNNOX for a screen with no controller, failing on every
- * cycle forever.
+ * This control IS the gate: the keyword selects a telemetry adapter on the
+ * backend, and a keyword with no adapter is never polled. It is a keyword rather
+ * than a checkbox because more media players are planned and each has its own
+ * API — the question is "which vendor", not "on or off". Rendering from
+ * PLAYER_KINDS means a new integration adds a map entry, not a new branch here.
+ *
+ * It is a human decision on purpose: detecting a NovaStar from build properties
+ * can be wrong, and a false positive would call a vendor API for a screen that
+ * has no controller, failing on every cycle forever.
  */
-export function MonitoringSource({
+export function PlayerKindPicker({
   screenId,
-  link,
+  value,
   onSaved,
 }: {
   screenId: string;
-  link: VnnoxLink;
-  onSaved: (next: VnnoxLink) => void;
+  value: PlayerKind;
+  onSaved: (next: PlayerKind) => void;
 }) {
-  const [enabled, setEnabled] = useState(link.enabled);
-  const [sn, setSn] = useState(link.vnnox_sn ?? link.detected_serial ?? "");
+  const [kind, setKind] = useState(value.player_kind);
+  const [sn, setSn] = useState(value.vnnox_sn ?? value.detected_serial ?? "");
   const [saving, setSaving] = useState(false);
 
   async function save() {
     setSaving(true);
     try {
       onSaved(
-        await api.put<VnnoxLink>(`/cms/screen-health/${screenId}/vnnox-link`, {
-          enabled,
-          vnnox_sn: sn || null,
+        await api.put<PlayerKind>(`/cms/screen-health/${screenId}/player-kind`, {
+          player_kind: kind,
+          vnnox_sn: kind === "novastar" ? sn || null : null,
         }),
       );
     } finally {
@@ -2496,41 +2760,24 @@ export function MonitoringSource({
 
   return (
     <Card className="space-y-4 p-4">
-      <h3 className="text-sm font-medium">Panel monitoring</h3>
+      <h3 className="text-sm font-medium">Player</h3>
 
-      <label className="flex cursor-pointer gap-3">
-        <input
-          type="radio"
-          checked={!enabled}
-          onChange={() => setEnabled(false)}
-          className="mt-1"
-        />
-        <span>
-          <span className="block text-sm">Our media player only</span>
-          <span className="block text-xs text-fg-muted">
-            Playback, screenshots and proof-of-play work as normal. No
-            per-cabinet health, because the player cannot see the panel.
+      {Object.entries(PLAYER_KINDS).map(([key, meta]) => (
+        <label key={key} className="flex cursor-pointer gap-3">
+          <input
+            type="radio"
+            checked={kind === key}
+            onChange={() => setKind(key)}
+            className="mt-1"
+          />
+          <span>
+            <span className="block text-sm">{meta.label}</span>
+            <span className="block text-xs text-fg-muted">{meta.blurb}</span>
           </span>
-        </span>
-      </label>
+        </label>
+      ))}
 
-      <label className="flex cursor-pointer gap-3">
-        <input
-          type="radio"
-          checked={enabled}
-          onChange={() => setEnabled(true)}
-          className="mt-1"
-        />
-        <span>
-          <span className="block text-sm">NovaStar controller + VNNOX Care</span>
-          <span className="block text-xs text-fg-muted">
-            Adds cabinet health, temperature, voltage and alarms. Scheduling
-            still runs entirely on our own player.
-          </span>
-        </span>
-      </label>
-
-      {enabled && (
+      {kind === "novastar" && (
         <div className="space-y-1 pl-7">
           <label className="text-xs text-fg-muted" htmlFor="vnnox-sn">
             VNNOX serial number
@@ -2541,22 +2788,22 @@ export function MonitoringSource({
             onChange={(e) => setSn(e.target.value)}
             placeholder="2YHA23C12A3A10080149"
           />
-          {link.detected_serial && link.detected_serial !== sn && (
+          {value.detected_serial && value.detected_serial !== sn && (
             <button
               type="button"
-              onClick={() => setSn(link.detected_serial!)}
+              onClick={() => setSn(value.detected_serial!)}
               className="text-xs text-accent underline"
             >
-              Use the serial the player detected ({link.detected_serial})
+              Use the serial the player detected ({value.detected_serial})
             </button>
           )}
         </div>
       )}
 
-      {!enabled && link.detected_vendor === "novastar" && (
+      {kind !== "novastar" && value.detected_vendor === "novastar" && (
         <p className="text-xs text-amber-400">
-          This player reports that it is running on a NovaStar box. You can turn
-          on panel monitoring above.
+          This player reports that it is running on a NovaStar box. Selecting
+          NovaStar above would add panel health for this screen.
         </p>
       )}
 
@@ -2573,11 +2820,12 @@ export function MonitoringSource({
 On the detail page, next to the tier badge:
 
 ```tsx
-{link.enabled ? (
-  <Badge tone="blue" title={link.effective_sn ?? undefined}>VNNOX Care</Badge>
-) : (
-  <Badge tone="gray">Not monitored</Badge>
-)}
+<Badge
+  tone={PLAYER_KINDS[kind.player_kind]?.tone ?? "gray"}
+  title={kind.effective_sn ?? undefined}
+>
+  {playerKindLabel(kind.player_kind)}
+</Badge>
 ```
 
 And under the header, VNNOX's own timestamp rather than our fetch time — their console warns of a synchronisation lag, and showing our poll time would overstate freshness:
@@ -2588,13 +2836,13 @@ And under the header, VNNOX's own timestamp rather than our fetch time — their
     Synchronised {new Date(detail.observed_at).toLocaleString()} (from VNNOX)
   </p>
 )}
-{link.enabled && link.last_error && (
-  <p className="text-xs text-amber-400">Last sync failed: {link.last_error}</p>
+{kind.monitored && kind.last_error && (
+  <p className="text-xs text-amber-400">Last sync failed: {kind.last_error}</p>
 )}
-{link.enabled && !link.effective_sn && (
+{kind.monitored && !kind.effective_sn && (
   <p className="text-xs text-amber-400">
-    Monitoring is on but no VNNOX serial is set, so this screen is not being
-    polled yet.
+    This screen is set to NovaStar but has no VNNOX serial, so it is not
+    being polled yet.
   </p>
 )}
 ```
@@ -2609,8 +2857,138 @@ Expected: no errors. Do not run `next build`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/types.ts src/components/screen-health/MonitoringSource.tsx "src/app/(dashboard)/screen-health"
+git add src/lib/types.ts src/components/screen-health/PlayerKindPicker.tsx "src/app/(dashboard)/screen-health"
 git commit -m "feat(screen-health): choose a screen's panel-monitoring source"
+```
+
+---
+
+## Task 10b: The player tag in the Screens section
+
+The keyword has to be visible where operators actually work — the **Screens** list — not only inside Screen Health. A fleet list that shows the tag answers "which of my screens can even report a dead cabinet?" at a glance; without it, that is invisible until someone asks why a screen has no health data.
+
+**Files:**
+- Modify: `app/screens/schemas.py` (`ScreenSummary`), `app/screens/service.py` (the summary builder)
+- Modify: `src/lib/types.ts` (`Screen`), `src/app/(dashboard)/screens/page.tsx`, `src/app/(dashboard)/screens/[id]/page.tsx`
+- Test: `tests/test_screen_summary_player_kind.py`
+
+**Interfaces:**
+- Consumes: `screens.player_kind` (Task 4), `vendor_for` (Task 6b), `PLAYER_KINDS` / `playerKindLabel` (Task 10).
+- Produces: `ScreenSummary.player_kind: str` and `ScreenSummary.panel_monitoring: bool`.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_screen_summary_player_kind.py
+"""The player tag on the fleet list.
+
+`panel_monitoring` is derived from the adapter registry rather than stored, so a
+screen cannot advertise monitoring by a vendor this build no longer has.
+"""
+
+from app.screens.service import summary_monitoring_flag
+
+
+def test_novastar_is_monitored():
+    assert summary_monitoring_flag("novastar") is True
+
+
+def test_andbox_is_not_monitored():
+    assert summary_monitoring_flag("andbox") is False
+
+
+def test_an_unrecognised_keyword_is_not_monitored():
+    """A screen registered by a newer APK shows its keyword but claims no
+    monitoring, because this backend has no adapter to do it with."""
+    assert summary_monitoring_flag("colorlight") is False
+
+
+def test_missing_keyword_is_not_monitored():
+    assert summary_monitoring_flag(None) is False
+```
+
+- [ ] **Step 2: Verify the test is valid**
+
+```bash
+poetry run python -m py_compile tests/test_screen_summary_player_kind.py && poetry run ruff check tests/test_screen_summary_player_kind.py
+```
+
+- [ ] **Step 3: Add the fields to `ScreenSummary`**
+
+In `app/screens/schemas.py`, on `ScreenSummary` beside `model` / `manufacturer`:
+
+```python
+    # Which player this screen runs, and therefore which telemetry adapter (if
+    # any) serves it. Shown as a tag on the fleet list.
+    player_kind: str = "andbox"
+    # Derived from the adapter registry, never stored — see summary_monitoring_flag.
+    panel_monitoring: bool = False
+```
+
+- [ ] **Step 4: Derive the flag in the service**
+
+In `app/screens/service.py`:
+
+```python
+def summary_monitoring_flag(player_kind: str | None) -> bool:
+    """Whether this screen's keyword actually resolves to a telemetry adapter.
+
+    Derived rather than stored so it cannot drift: removing an adapter makes
+    every screen using it report `panel_monitoring: false` immediately, with no
+    migration and no rows left claiming a capability that no longer exists.
+    """
+    from app.health.vendors.registry import vendor_for
+
+    return vendor_for(player_kind) is not None
+```
+
+Populate both fields wherever `ScreenSummary` is built:
+
+```python
+        player_kind=screen.player_kind,
+        panel_monitoring=summary_monitoring_flag(screen.player_kind),
+```
+
+- [ ] **Step 5: Add the fields to the CMS type**
+
+In `src/lib/types.ts`, on the `Screen` type beside `model` / `manufacturer`:
+
+```ts
+  player_kind?: string;
+  panel_monitoring?: boolean;
+```
+
+- [ ] **Step 6: Render the tag on the fleet list and the screen page**
+
+In `src/app/(dashboard)/screens/page.tsx`, in each screen row beside the status badge:
+
+```tsx
+<Badge tone={PLAYER_KINDS[screen.player_kind ?? ""]?.tone ?? "gray"}>
+  {playerKindLabel(screen.player_kind)}
+</Badge>
+```
+
+Import from `@/lib/types`. Do the same on `src/app/(dashboard)/screens/[id]/page.tsx` in the header, next to the screen name.
+
+Fall back to the raw keyword rather than hiding it: a screen registered by an APK newer than this CMS should show `colorlight` rather than nothing, so an unfamiliar tag prompts a question instead of silently reading as AndBox.
+
+- [ ] **Step 7: Verify**
+
+```bash
+cd markai-signage-api && poetry run python -c "
+from app.screens.service import summary_monitoring_flag as f
+assert f('novastar') and not f('andbox') and not f('colorlight') and not f(None)
+print('tag flag ok')
+"
+poetry run ruff check app/screens
+cd ../markai-Web-cms && npx tsc --noEmit
+```
+Expected: `tag flag ok`, then no output from ruff or tsc.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git commit -am "feat(screens): tag each screen with its player keyword"
 ```
 
 ---
@@ -3007,6 +3385,6 @@ git commit -m "docs: VNNOX Care configuration"
 
 Two facts cannot be settled without the real controller. Both have a fallback already built, so neither blocks the rollout.
 
-- [ ] **Does `ro.serialno` match VNNOX's SN?** On the box: `adb shell getprop ro.serialno`, and compare with the SN in VNNOX Care. If they differ, set the override via `PUT /api/cms/screen-health/{id}/vnnox-link` and record the real relationship in `docs/`.
+- [ ] **Does `ro.serialno` match VNNOX's SN?** On the box: `adb shell getprop ro.serialno`, and compare with the SN in VNNOX Care. If they differ, set the override via `PUT /api/cms/screen-health/{id}/player-kind` and record the real relationship in `docs/`.
 - [ ] **How does a dead cabinet actually present?** Unplug one receiving card's data cable and re-poll. Note whether it disappears from `receivingCard.monitor` or appears with `status: false`. The adapter handles both; this is to learn which, not to fix anything.
 - [ ] **Does the alarm `position` for a disconnected card resolve to the right cabinet?** Compare `describe_position` output with the Location column in VNNOX's Alarm History.

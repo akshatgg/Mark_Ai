@@ -39,14 +39,30 @@ Not every screen has a NovaStar. Some run the plain AndBox player, which has no
 controller telemetry at all. Calling VNNOX for those screens would produce a
 guaranteed error on every poll.
 
-The gate is **an explicit choice on the screen form**, stored as a row:
+The gate is **a keyword, not a boolean**: `screens.player_kind`, chosen explicitly
+by a person.
 
-> **Panel monitoring**
-> ( ) Our media player only — no panel telemetry
-> (•) NovaStar controller + VNNOX Care → *VNNOX serial:* `[____________]`
+> **Player**
+> ( ) AndBox — our own media player
+> (•) NovaStar — controller + VNNOX Care → *VNNOX serial:* `[____________]`
 
-A screen with no `screen_vnnox_link` row is never in a batch, and that row is
-created **only** by an operator picking the second option.
+A boolean would have been enough for today, and is the wrong shape for what is
+coming. More media players are planned, **each with its own telemetry API**, so
+the question is never "is monitoring on" but "**which vendor's API do we call for
+this screen**". A keyword answers that; a boolean would have to be replaced by one
+the first time a second vendor appears, and every call site that branched on it
+rewritten.
+
+So the keyword selects an adapter from a registry:
+
+```python
+HEALTH_ADAPTERS = {"novastar": VnnoxCareAdapter()}   # colorlight, linsn, … later
+```
+
+`andbox` is simply a keyword with **no registered adapter**, which is why our own
+media player is never called for. It is not a special case in the code — it is the
+absence of an entry. Adding a vendor later means writing an adapter and adding one
+line here; nothing that already works has to change.
 
 An earlier draft made this automatic: the APK would report the box's serial and
 the backend would create the link. That was rejected. Detecting "this is a
@@ -57,7 +73,7 @@ wrong in that direction, and works before the APK is upgraded.
 
 The APK's detected serial is kept as a **prefill suggestion** on the form, never
 as a trigger. Vendor detection survives only as a hint shown to the operator
-("this box looks like a NovaStar — enable panel monitoring?"), never as a gate.
+("this box looks like a NovaStar — set the keyword?"), never as a gate.
 
 ### The choice is offered twice, and it is the same choice
 
@@ -66,24 +82,29 @@ standing at the box and knows what it is, which is the best-informed moment
 anyone will ever have:
 
 > **What is this box?**
-> ( ) Our media player
+> ( ) AndBox — our own media player
 > ( ) NovaStar controller → *serial:* `[2YHA23C12A3A10080149]` (detected)
+
+The APK sends the keyword the answer produced, in `player_kind`. As more players
+are integrated, this list grows — which is the second reason it is a keyword and
+not a checkbox: an installer will eventually be choosing between four boxes, not
+ticking one.
 
 **In the CMS**, on the screen page, for correction and for screens already in the
 field whose APK predates this.
 
-Both write the same `screen_vnnox_link` row. Neither infers anything.
+Both set the same `screens.player_kind`. Neither infers anything.
 
 Three rules keep the two from fighting:
 
-* **Registration creates, never overwrites.** Re-registration is idempotent on
-  `device_uid` and happens on reinstall or factory reset. If a link row already
-  exists, registration leaves it alone — otherwise a reinstall would silently
-  undo an operator's CMS correction.
-* **No answer means no link.** The zero-touch/MDM path shows no UI and prompts
-  nobody (`require_enrollment_key: false`), so those screens arrive unlinked and
-  an operator sets the source in the CMS. Unmonitored is the safe default;
-  wrongly monitored is not.
+* **Registration sets the keyword once, never overwrites.** Re-registration is
+  idempotent on `device_uid` and happens on reinstall or factory reset. If the
+  screen already has a non-default keyword, registration leaves it alone —
+  otherwise a reinstall would silently undo an operator's CMS correction.
+* **No answer means the default keyword.** The zero-touch/MDM path shows no UI
+  and prompts nobody (`require_enrollment_key: false`), so those screens arrive
+  as `andbox` and an operator sets the real keyword in the CMS. Unmonitored is
+  the safe default; wrongly monitored is not.
 * **The CMS is the authority afterwards.** Install-time is a convenience for
   getting it right the first time, not a second source of truth.
 
@@ -172,24 +193,26 @@ already carries 60+.
 | Column | Purpose |
 |---|---|
 | `screen_id` | unique FK |
-| `vendor` | `novastar` |
 | `vnnox_sn` | the SN we poll — set by the operator, prefilled from the detected serial |
 | `vnnox_sid` | VNNOX's numeric screen id, cached from `screen/list` |
 | `last_sync_at`, `last_error` | sync bookkeeping, surfaced in the CMS |
 
-**The row's existence is the gate.** It is created only when an operator selects
-NovaStar + VNNOX Care on the screen form, and deleted when they switch back.
+This table is **the NovaStar adapter's own configuration**, not the gate. A second
+vendor gets its own table with its own fields rather than columns bolted onto this
+one, because a Colorlight controller has no `vnnox_sn` and pretending otherwise
+produces a table of mostly-null columns.
 
-### New: two columns on `screens`
+### New: three columns on `screens`
 
 | Column | Purpose |
 |---|---|
+| `player_kind` | **the keyword** — `andbox`, `novastar`, … Selects the adapter. |
 | `controller_serial` | `ro.serialno` as read by the APK — informational |
-| `controller_vendor` | `novastar` when the box's build properties suggest it |
+| `controller_vendor` | what the box's build properties suggest — informational |
 
-These are **detection output, never a gate**. They exist so the form can prefill
-the serial and suggest enabling monitoring. A screen can carry both and still
-never be polled, because the operator did not tick the box.
+`player_kind` is the gate. The other two are **detection output, never a gate**:
+they exist so the form can prefill the serial and suggest a keyword. A screen can
+carry both and still never be polled, because nobody chose the keyword.
 
 `vnnox_sn` is stored separately from `screens.controller_serial` because we do not
 yet know that a Taurus's Android serial equals the SN VNNOX indexes it by. If they
@@ -291,7 +314,28 @@ this becomes the fourth such job.
 
 Two screens cost 12 requests/hour, roughly 1% of budget.
 
-## CMS surfaces
+## The player tag in the Screens section
+
+The choice must be visible where operators actually live, which is the **Screens**
+list — not buried in Screen Health. Every screen row and every screen page carries
+a tag naming the hardware:
+
+| Tag | `player_kind` | Adapter | Panel monitoring |
+|---|---|---|---|
+| **NovaStar** | `novastar` | VNNOX Care | Yes — polled every 5 min |
+| **AndBox** | `andbox` | *none registered* | **No** — nothing is called |
+
+The tag is not decoration. It is the visible form of the gate: an operator looking
+at a fleet list can see at a glance which screens can report a dead cabinet and
+which cannot, which is otherwise invisible until someone asks why a screen has no
+health data.
+
+`andbox` never triggers monitoring — not because it is special-cased, but because
+no adapter is registered for it. Only a keyword with an adapter causes a call.
+
+The tag is the keyword's label, mapped in the CMS. A new integration adds a row to
+that map and an adapter to the registry; the tag column, the sync loop and every
+existing screen are untouched.
 
 Existing pages under `/screen-health`, extended to full parity with VNNOX Care:
 
