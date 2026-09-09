@@ -2912,6 +2912,187 @@ Expected: `stamp ok`, no ruff output, `BUILD SUCCESSFUL`.
 git commit -am "feat(apk): stamp the player keyword into the personalised download"
 ```
 
+---
+
+## Task 9c: "Update Now" installs a stamped APK
+
+The OTA path hands the agent `release.gcs_object` — the generic, unstamped release — so an updated box carries no stamp at all. Harmless today (the enrollment key is already in prefs after first launch), but it means the keyword would never reach a box that is *updated* rather than freshly enrolled, which after the first install is every box.
+
+**And there is a live trap:** `claim_jobs` also hands over `release.sha256`, which the agent verifies before installing. A stamped file has a different hash. Serving one without fixing the digest fails verification on every box.
+
+The rule: an update serves the APK stamped with **that screen's current keyword** — not a hardcoded `andbox`. Today's single production screen is `andbox` by the migration backfill, so it gets `p: "andbox"` automatically; a screen switched to NovaStar in the CMS gets `p: "novastar"` on its next update, with no special case anywhere.
+
+**Files:**
+- Modify: `app/apk/service.py` (personalised path + digest), `app/apk/update_service.py` (`claim_jobs`)
+- Test: `tests/test_apk_update_stamp.py`
+
+**Interfaces:**
+- Consumes: `inject_key` with `player_kind` (Task 9b), `Screen.player_kind` (Task 4).
+- Produces: `async def stamped_artifact_for(db, screen, release) -> tuple[str, str]` returning `(gcs_object, sha256)`; `personalized_object_path(owner_id, version_code, player_kind)`.
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+# tests/test_apk_update_stamp.py
+"""An OTA update must install the APK stamped for that screen.
+
+The agent verifies the sha256 it was handed before installing, so the digest and
+the object must describe the SAME bytes. Handing over a stamped object with the
+generic release's hash fails the update on every box.
+"""
+
+import hashlib
+
+from app.apk.service import personalized_object_path
+
+
+def test_the_path_varies_by_keyword():
+    """An owner's AndBox and NovaStar builds are different files. One shared path
+    would serve whichever was stamped last."""
+    assert personalized_object_path("owner-1", 10000, "andbox") != (
+        personalized_object_path("owner-1", 10000, "novastar")
+    )
+
+
+def test_the_path_still_groups_by_owner_first():
+    """Regenerating an enrollment key wipes an owner's builds with one prefix
+    delete, so the owner must stay the first segment."""
+    assert personalized_object_path("owner-1", 10000, "andbox").startswith(
+        "apk/personalized/owner-1/"
+    )
+
+
+def test_the_default_keyword_is_andbox():
+    assert personalized_object_path("owner-1", 10000).endswith("andbox.apk")
+
+
+def test_stamping_changes_the_digest():
+    """The whole reason the update path cannot reuse release.sha256."""
+    plain = b"not-really-an-apk"
+    assert hashlib.sha256(plain).hexdigest() != hashlib.sha256(plain + b"stamp").hexdigest()
+```
+
+- [ ] **Step 2: Verify the test is valid**
+
+```bash
+poetry run python -m py_compile tests/test_apk_update_stamp.py && poetry run ruff check tests/test_apk_update_stamp.py
+```
+
+- [ ] **Step 3: Key the cache by keyword and record the stamped digest**
+
+In `app/apk/service.py`:
+
+```python
+def personalized_object_path(
+    owner_id: str, version_code: int, player_kind: str = "andbox"
+) -> str:
+    """Cache path for one owner's copy of one release, for one player kind.
+
+    Keyed OWNER first, then version, then keyword. Owner first because
+    regenerating their enrollment key must wipe all their builds with a single
+    prefix delete. The keyword is part of the file's identity rather than
+    metadata about it: an owner's AndBox and NovaStar builds are different bytes,
+    and sharing a path would serve whichever was stamped last.
+    """
+    return f"{PERSONALIZED_PREFIX}/{owner_id}/{version_code}/{player_kind}.apk"
+```
+
+Record the stamped file's own digest when the build is created, so later cache hits need not re-download and re-hash it:
+
+```python
+        stamped_sha256 = hashlib.sha256(personalized).hexdigest()
+        upload_to_gcs(
+            personalized,
+            blob_name,
+            content_type=APK_CONTENT_TYPE,
+            content_disposition=f'attachment; filename="{filename}"',
+            # The agent verifies this before installing, so it must describe the
+            # STAMPED bytes. release.sha256 describes the file before stamping
+            # and would fail verification on every box.
+            metadata={"sha256": stamped_sha256},
+        )
+```
+
+Return that digest from the download response instead of `release.sha256`, reading it back from `get_blob_metadata(blob_name)` on a cache hit. This also fixes the browser download, which currently advertises the unstamped hash for a stamped file.
+
+- [ ] **Step 4: Hand the agent the stamped artifact**
+
+In `app/apk/update_service.py`:
+
+```python
+async def stamped_artifact_for(
+    db: AsyncSession, screen: Screen, release: ApkRelease
+) -> tuple[str, str]:
+    """The object and digest to install on *screen*.
+
+    Falls back to the generic release when the screen has no owner or stamping
+    fails. An unstamped update still works — the box keeps whatever keyword the
+    backend already holds — whereas a failed update leaves it on an old build,
+    so stamping must never be the thing that blocks an update.
+    """
+    from app.apk.service import ensure_personalized_build
+
+    owner = await _owner_of(db, screen)
+    if owner is None:
+        return release.gcs_object, release.sha256
+    try:
+        return await ensure_personalized_build(
+            owner, release, player_kind=screen.player_kind
+        )
+    except Exception:  # noqa: BLE001 - never block an update on stamping
+        logger.exception(
+            "Falling back to the unstamped release for screen %s", screen.id
+        )
+        return release.gcs_object, release.sha256
+```
+
+And in `claim_jobs`, replace the two hardcoded fields:
+
+```python
+        gcs_object, sha256 = await stamped_artifact_for(db, screen, release)
+        claimed.append(
+            AgentJob(
+                job_id=job.id,
+                screen_id=screen.id,
+                tailscale_ip=screen.tailscale_ip,
+                target_version_code=job.target_version_code,
+                gcs_object=gcs_object,
+                sha256=sha256,
+            )
+        )
+```
+
+- [ ] **Step 5: Verify**
+
+```bash
+poetry run python -c "
+from app.apk.service import personalized_object_path as p
+assert p('o',10000,'andbox') != p('o',10000,'novastar')
+assert p('o',10000,'andbox').startswith('apk/personalized/o/')
+assert p('o',10000).endswith('andbox.apk')
+print('paths ok:', p('o',10000,'andbox'))
+"
+poetry run ruff check app/apk
+```
+Expected: `paths ok: apk/personalized/o/10000/andbox.apk`, no ruff output.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/apk tests/test_apk_update_stamp.py
+git commit -m "feat(apk): install the stamped build on update, with its own digest"
+```
+
+### The one-release lag
+
+The build that *reads* the stamp must be installed before the stamp does anything, so the first stamped update delivers an APK that cannot yet read `p`. For the current production screen:
+
+1. Publish the release containing `EmbeddedKey.playerKind()`.
+2. Click **Update Now** — the agent installs it stamped `p: "andbox"`.
+3. That build reads its own stamp and reports `andbox` on the next heartbeat.
+4. The backend already held `andbox` from the migration backfill, so nothing changes — which is the point. The screen is correct before, during, and after.
+
+
 ## Task 10: CMS — the player-keyword picker, badge, and corrected tier copy
 
 **Files:**
