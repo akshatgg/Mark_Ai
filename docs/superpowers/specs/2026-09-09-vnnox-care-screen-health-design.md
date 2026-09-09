@@ -95,7 +95,27 @@ field whose APK predates this.
 
 Both set the same `screens.player_kind`. Neither infers anything.
 
-Three rules keep the two from fighting:
+**The heartbeat carries it too.** The APK stores the installer's answer and
+re-asserts it on every beat, so a screen whose registration partly failed heals
+itself on the next check-in instead of waiting for a reinstall.
+
+That is only safe with a precedence ladder, because the beat fires every 60
+seconds and would otherwise revert a human edit within a minute — 1,440 writes a
+day against one considered correction. `screens.player_kind_source` records who
+last set the keyword:
+
+| Source | Set by | Can be overwritten by |
+|---|---|---|
+| `default` | migration backfill (`andbox`) | install, heartbeat, CMS |
+| `install` | the installer's answer at registration | CMS only |
+| `cms` | an operator on the screen page | CMS only |
+
+So the heartbeat can fill in a keyword nobody has set, and can never argue with
+one somebody has. A disagreement between what the box reports and what the CMS
+says is **shown, not resolved**: "this player reports it is on a NovaStar box"
+sits next to the setting, and a human decides.
+
+Three further rules keep install-time and the CMS from fighting:
 
 * **Registration sets the keyword once, never overwrites.** Re-registration is
   idempotent on `device_uid` and happens on reinstall or factory reset. If the
@@ -133,19 +153,42 @@ rather than the `403 INSUFFICIENT_PERMISSIONS` that blocked the previous key.
 The two camera endpoints return `500 INTERNAL SERVER ERROR` for a non-existent
 `sid`. Authorization is **unproven** for those; camera is out of scope for v1.
 
-### Rate limit (undocumented; read from response headers)
+### Rate limit
+
+**Documented** in the API Access Guide (`doc-4696857`), under "Rate Limits", and
+stated **per IP address**:
+
+    Instantaneous:  no more than 15 calls per second   per IP
+    Cumulative:     no more than 1500 calls per hour    per IP
+
+**Enforced**, per the headers on every live response, is stricter:
 
     X-RateLimit-Limit-Second: 5
     X-RateLimit-Limit-Hour:   1000
     Retry-After: 1            (on 429)
 
-Account-wide, shared across every endpoint. This is a hard architectural
-constraint, not a tuning parameter:
+Design against **5/sec and 1000/hour** — the observed pair — and treat the
+documented numbers as an upper bound not to rely on. The client reads
+`X-RateLimit-Remaining-Hour` off each response so the real budget can be logged
+rather than discovered by hitting the ceiling.
+
+The counter is shared across every endpoint: nine different endpoints called in
+sequence decremented one counter. Because the limit is keyed to the **IP**, the
+budget belongs to the backend's egress address, and anything else calling VNNOX
+from that address shares it.
+
+Two consequences:
+
+* **Failed calls still cost.** A `406 "screen not exist"` decrements the budget
+  exactly like a success, so a screen with a wrong SN quietly spends requests on
+  every cycle while returning nothing. This is why the sync writes `last_error`
+  to the link row and the CMS surfaces it.
+* This is a hard architectural constraint, not a tuning parameter:
 
 | Approach | Cost/screen/cycle | Max fleet at 5-min polling |
 |---|---|---|
 | 14 per-endpoint calls | 14 req | **~5 screens** |
-| `POST /all` (10 screens/call) | 0.1 req | **~800 screens** |
+| `POST /all` (10 screens/call) | 0.1 req | **~830 screens** |
 
 `POST /v2/device-status-monitor/all` is therefore **mandatory**, not an
 optimisation. Per-endpoint routes are used only for on-demand drill-down when an
@@ -154,6 +197,10 @@ operator opens one screen.
 `brightness/history` has no bulk form (1 request per screen), so it is **never**
 polled on a cycle — fetched on demand when the chart is opened, plus an optional
 daily backfill.
+
+**5/sec is a burst ceiling, not a sustainable rate.** Running at it would spend
+the whole hourly budget in 200 seconds. The sustainable rate is one request every
+3.6 seconds; the 5-minute cycle uses a small fraction of that.
 
 ### The blocker
 

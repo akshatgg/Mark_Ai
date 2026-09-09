@@ -14,7 +14,7 @@
 - **Do not run `next build`** in any web project — it clobbers `.next` under the running dev server. Verify with `npx tsc --noEmit`.
 - **Secrets stay backend-only.** `VNNOX_APP_KEY` / `VNNOX_APP_SECRET` are never `NEXT_PUBLIC_*` and never reach the browser.
 - **Only `/v2/device-status-monitor/*` endpoints may be called.** VNNOX's player, program, real-time-control and scheduled-control APIs are out of bounds — our backend already owns scheduling and playback.
-- **`POST /v2/device-status-monitor/all` is the only endpoint used on a polling cycle.** Rate limit is 5/sec and 1000/hour account-wide; per-endpoint polling caps the fleet at ~5 screens.
+- **`POST /v2/device-status-monitor/all` is the only endpoint used on a polling cycle.** Enforced rate limit is 5/sec and 1000/hour (the Access Guide documents 15/sec and 1500/hour per IP; the headers are stricter — design against the headers). Per-endpoint polling caps the fleet at ~5 screens. Failed calls decrement the budget too.
 - **`unknown` is never rendered as `ok`.** A screen VNNOX did not answer for has grey cabinets, not green.
 - **The gate is a KEYWORD, never a boolean and never inference.** `screens.player_kind` (`andbox`, `novastar`, …) selects a telemetry adapter from a registry. More media players are coming, each with its own API, so anything that reduces this to on/off is wrong. `andbox` is not special-cased — it simply has no registered adapter.
 - **Only a person sets the keyword** — the installer at enrollment, or an operator in the CMS. Serial/vendor detection by the APK is a prefill suggestion and must never set it.
@@ -450,13 +450,15 @@ Server clock skew must stay within 5 minutes, so a host with a drifting clock
 fails every call with a signature error — worth knowing before debugging the
 signature itself.
 
-Rate limiting is real and undocumented in their guide, but every response
-carries it:
+Rate limiting is documented in the Access Guide as 15/sec and 1500/hour PER IP,
+but the headers on every live response enforce something stricter:
 
     X-RateLimit-Limit-Second: 5      X-RateLimit-Limit-Hour: 1000
 
-Account-wide, shared across all endpoints. We pace under the per-second wall and
-honour `Retry-After` on a 429 instead of guessing a backoff.
+Trust the headers, not the guide. The counter is shared across all endpoints, and
+a failed call (406 "screen not exist") decrements it exactly like a success. We
+pace under the per-second wall and honour `Retry-After` on a 429 rather than
+guessing a backoff.
 """
 
 from __future__ import annotations
