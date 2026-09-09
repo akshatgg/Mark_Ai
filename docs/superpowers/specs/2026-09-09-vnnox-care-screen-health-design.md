@@ -394,6 +394,41 @@ this becomes the fourth such job.
 
 Two screens cost 12 requests/hour, roughly 1% of budget.
 
+## The three player types this is built for
+
+The keyword is not a NovaStar flag. It is the answer to "which health API does
+this screen use", and the roadmap has at least three answers:
+
+| Keyword | Monitoring hardware | Health source |
+|---|---|---|
+| `andbox` | none | nothing — no adapter registered |
+| `novastar` | NovaStar cards, VNNOX-managed | VNNOX Care cloud |
+| `markai` *(planned)* | Mark AI's own monitoring chip | our own API, or the player itself |
+
+A `novastar` screen never touches the Mark AI chip's API and vice versa, because
+the registry only ever resolves a screen's own keyword. That isolation is the
+reason this is a keyword and not a boolean.
+
+**Adding the third type is: write an adapter, add one registry line, add one
+label.** The cron iterates `HEALTH_ADAPTERS` rather than naming a vendor, so it
+does not change. Neither do the four tables, `record_health`, the capability
+tiers, or any CMS view — those are already vendor-neutral and driven by
+`HealthReport`.
+
+Each vendor selects its own screens (`poll_due`) rather than being handed them,
+because each has its own config table — `screen_vnnox_link` here, something else
+for the chip — and a registry that selected generically would have to know every
+vendor's schema.
+
+### The registry means "we poll it", not "it has health"
+
+If the Mark AI chip is read by our own APK and reported on the heartbeat, it gets
+**no registry entry**: there is nothing for the backend to poll. The keyword still
+tags the screen, and `vendor_owns_health` correctly returns False, so the
+heartbeat stays the source. A registry entry is specifically the statement *the
+backend calls an external API for this screen* — which is what must be true for
+the heartbeat to be overruled.
+
 ## The player tag in the Screens section
 
 The choice must be visible where operators actually live, which is the **Screens**

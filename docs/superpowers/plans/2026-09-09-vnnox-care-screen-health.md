@@ -1705,18 +1705,25 @@ sends a new keyword out ahead of the backend that understands it.
 
 from __future__ import annotations
 
-from typing import Optional, Protocol, Sequence
+from typing import Optional, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class HealthVendor(Protocol):
-    """One vendor's panel telemetry."""
+    """One vendor's panel telemetry.
+
+    `poll_due` selects its own screens rather than being handed them: each
+    vendor has its own config table and its own notion of "ready to poll", and a
+    registry that tried to select generically would end up knowing every
+    vendor's schema.
+    """
 
     key: str
+    label: str
 
-    async def poll(self, db: AsyncSession, links: Sequence[object]) -> object:
-        """Fetch and persist health for the given screens."""
+    async def poll_due(self, db: AsyncSession) -> object:
+        """Fetch and persist health for every screen this vendor owns."""
         ...
 
 
@@ -1763,13 +1770,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class VnnoxCareVendor:
+    """VNNOX Care, as the registry sees it.
+
+    A thin object over sync.py so the registry has something uniform to call.
+    `poll_due` owns its own selection because only this adapter knows that its
+    screens are the ones with a `screen_vnnox_link` row — a future vendor will
+    have its own config table and its own answer to "which screens are mine".
+    """
+
     key = "novastar"
     label = "NovaStar"
 
-    async def poll(self, db: AsyncSession, links: Sequence[object]):
-        from app.health.vendors.vnnox.sync import poll_links
+    async def poll_due(self, db: AsyncSession):
+        from app.health.vendors.vnnox.sync import sync_all
 
-        return await poll_links(db, links)
+        return await sync_all(db)
 ```
 
 - [ ] **Step 5: Verify**
@@ -2041,26 +2056,42 @@ def _require_cron_secret(x_cron_secret: str = Header(default="")) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
-@cron_router.post("/vnnox-health")
-async def cron_vnnox_health(
+@cron_router.post("/panel-health")
+async def cron_panel_health(
     _=Depends(_require_cron_secret),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Poll VNNOX Care for every linked screen.
+    """Poll every registered telemetry vendor for the screens it owns.
+
+    Iterates the registry rather than naming a vendor, so adding an integration
+    is an adapter plus one registry line — this route never changes. A vendor
+    that raises is logged and skipped: one broken integration must not stop the
+    others from reporting.
 
     Runs on cron-job.org every 5 minutes (GCP Cloud Scheduler is disabled on
-    this project). At 12 cycles/hour and one request per ten screens, a
-    hundred-screen fleet spends 120 of the 1500 hourly requests.
+    this project). For VNNOX that is 12 cycles/hour at one request per ten
+    screens — a hundred-screen fleet spends 120 of the 1500 hourly requests.
     """
+    from app.health.vendors.registry import HEALTH_ADAPTERS
+
     if not settings.VNNOX_ENABLED:
         return {"skipped": True}
-    summary = await sync_all(db)
-    return {
-        "screens_polled": summary.screens_polled,
-        "screens_failed": summary.screens_failed,
-        "batches": summary.batches,
-        "errors": summary.errors[:20],
-    }
+
+    results: dict[str, dict] = {}
+    for key, vendor in HEALTH_ADAPTERS.items():
+        try:
+            summary = await vendor.poll_due(db)
+        except Exception:  # noqa: BLE001 - one vendor must not stop the rest
+            logger.exception("panel-health: vendor %s failed", key)
+            results[key] = {"error": "failed, see logs"}
+            continue
+        results[key] = {
+            "screens_polled": summary.screens_polled,
+            "screens_failed": summary.screens_failed,
+            "batches": summary.batches,
+            "errors": summary.errors[:20],
+        }
+    return {"vendors": results}
 ```
 
 - [ ] **Step 5: Mount the cron router**
@@ -2079,7 +2110,7 @@ api_router.include_router(health_cron_router)
 poetry run python -c "
 from app.main import app
 paths = [r.path for r in app.routes]
-assert any('/cron/vnnox-health' in p for p in paths), paths
+assert any('/cron/panel-health' in p for p in paths), paths
 print('route mounted')
 "
 poetry run ruff check app/health
@@ -3611,14 +3642,14 @@ Expected: the account list names the account the screens live under, and `screen
 - [ ] **Step 3: Run one sync by hand**
 
 ```bash
-curl -s -X POST localhost:8095/api/cron/vnnox-health -H "X-Cron-Secret: $CRON_SECRET" | python3 -m json.tool
+curl -s -X POST localhost:8095/api/cron/panel-health -H "X-Cron-Secret: $CRON_SECRET" | python3 -m json.tool
 ```
 Expected: `screens_polled` equals the number of linked screens, `screens_failed` is 0.
 
 - [ ] **Step 4: Register the cron job**
 
 Add a job on **cron-job.org** (not GCP Cloud Scheduler — its API is disabled on this project), every 5 minutes:
-`POST https://<api-host>/api/cron/vnnox-health` with header `X-Cron-Secret`.
+`POST https://<api-host>/api/cron/panel-health` with header `X-Cron-Secret`.
 
 - [ ] **Step 5: Check the CMS against VNNOX's own console**
 
