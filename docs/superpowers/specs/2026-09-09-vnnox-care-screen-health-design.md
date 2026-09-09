@@ -1,0 +1,304 @@
+# VNNOX Care screen health — design
+
+**Date:** 2026-09-09
+**Surface:** `markai-Web-cms` → `/screen-health` (existing pages, extended)
+**Backends touched:** `markai-signage-api` (new vendor adapter + sync), `markai-player-apk` (reports controller serial)
+**Status:** design approved 2026-09-09; blocked on an account fix before it can be verified against real hardware
+
+## Problem
+
+Our APK cannot see whether the LED wall is actually lit. It takes screenshots by
+`PixelCopy`-ing its own window buffer — the pixels we *send*, never the pixels the
+wall *produces*. A dead cabinet, a failed driver IC, a disconnected receiving card:
+all invisible, and the JPEG comes back clean however broken the wall is.
+
+NovaStar's own cloud already knows. The controller polls every receiving card
+continuously in order to push pixels to it, and reports what it finds to VNNOX Care.
+We read that back rather than reimplementing it.
+
+This is Phase C of the screen-health subsystem. Phases A and B — the capability
+tiers, the four tables, the CMS pages — were built on 2026-08-06 and are stranded
+on the `dev` branch of all three repos. Phase C was previously planned as a port of
+NovaStar's reverse-engineered TCP protocol; **that plan is superseded.**
+
+## Governing constraint: VNNOX is a sensor, not a controller
+
+Our APK runs **on** the NovaStar controller (a TB1‑4G Taurus). Our backend owns
+scheduling, playback, proof-of-play, screenshots, operating hours — all of it,
+unchanged. VNNOX supplies exactly one thing: the hardware telemetry the APK
+physically cannot observe.
+
+**We call `/v2/device-status-monitor/*` and nothing else.** VNNOX's player,
+program, real-time-control and scheduled-control APIs are off limits — they
+duplicate functionality that already exists and works, and calling them would
+create two sources of truth for the same screen.
+
+## Governing constraint: no link, no call
+
+Not every screen has a NovaStar. Some run the plain AndBox player, which has no
+controller telemetry at all. Calling VNNOX for those screens would produce a
+guaranteed error on every poll.
+
+The gate is a **row in a table, not a heuristic**. A screen with no
+`screen_vnnox_link` row is never included in a batch, so a non-VNNOX screen cannot
+error because it is never the subject of a request.
+
+## Verified against the live API (2026-09-09)
+
+All facts below were confirmed by real calls with the production key, not read from
+documentation.
+
+### Auth
+
+Base `https://open-in.vnnox.com` (IN node; `open-us` / `open-eu` / `open-au` exist).
+Four headers, no token exchange:
+
+    AppKey, Nonce (8–64 alphanumeric), CurTime (unix seconds),
+    CheckSum = SHA256(AppSecret + Nonce + CurTime)
+
+Clock skew must stay under 5 minutes. Secrets live in backend env only — never
+`NEXT_PUBLIC_*`.
+
+### Permission
+
+All 17 Device Status Monitoring endpoints are authorized. A made-up SN returns
+`406 ERROR-100002 "screen not exist"` — the last check before data is returned —
+rather than the `403 INSUFFICIENT_PERMISSIONS` that blocked the previous key.
+
+The two camera endpoints return `500 INTERNAL SERVER ERROR` for a non-existent
+`sid`. Authorization is **unproven** for those; camera is out of scope for v1.
+
+### Rate limit (undocumented; read from response headers)
+
+    X-RateLimit-Limit-Second: 5
+    X-RateLimit-Limit-Hour:   1000
+    Retry-After: 1            (on 429)
+
+Account-wide, shared across every endpoint. This is a hard architectural
+constraint, not a tuning parameter:
+
+| Approach | Cost/screen/cycle | Max fleet at 5-min polling |
+|---|---|---|
+| 14 per-endpoint calls | 14 req | **~5 screens** |
+| `POST /all` (10 screens/call) | 0.1 req | **~800 screens** |
+
+`POST /v2/device-status-monitor/all` is therefore **mandatory**, not an
+optimisation. Per-endpoint routes are used only for on-demand drill-down when an
+operator opens one screen.
+
+`brightness/history` has no bulk form (1 request per screen), so it is **never**
+polled on a cycle — fetched on demand when the chart is opened, plus an optional
+daily backfill.
+
+### The blocker
+
+The API key's account is `akshatgg` (org admin, no sub-users, zero devices). The
+real screens live under VNNOX Care account **MantriLED** (`in.vnnox.com/care`,
+screen 4685 "LED 16"). Different tenants — the key returns `total: 0` and will
+keep doing so.
+
+**Resolution required before any live verification:** generate AK/AS from inside
+the MantriLED account, or add `akshatgg` as a sub-user there.
+`GET /v2/integration/account/list` returns the users *including sub-users* who have
+access, and is the check for whether this is fixed.
+
+## Data model
+
+### Existing (Phase A/B, migration `0038_panel_health`)
+
+Slot `0038` is still free on `main`, so the migration rebases cleanly.
+
+| Table | Behaviour | Holds |
+|---|---|---|
+| `screen_health` | 1:1, upsert | tier, controller brand/model/firmware, brightness, resolution, cabinets total/ok/degraded/dark, `unreachable_since` |
+| `screen_panels` | map, upsert | `cabinet_id`, `row_index`/`col_index`, `x`/`y`/`w`/`h`, `label` |
+| `panel_readings` | latest, upsert | `state`, `temperature_c`, `fan_rpm`, `voltages` (JSON), `door_open`, `smoke_alarm`, `flat_cable_ok`, `module_status` |
+| `panel_health` | fault log, **append on state CHANGE only** | `state`, `observed_at`, `last_seen_at`, `resolved_at` |
+
+Readings and faults are separate because a temperature is a time series and a fault
+is an interval. Current panel state is **derived**: no open `panel_health` row means
+`ok`, enforced by the partial unique index `uq_panel_health_open` on
+`(panel_id) WHERE resolved_at IS NULL`.
+
+### New: `screen_vnnox_link`
+
+1:1 with `screens`. A separate table rather than more columns on `screens`, which
+already carries 60+.
+
+| Column | Purpose |
+|---|---|
+| `screen_id` | unique FK |
+| `vendor` | `novastar` |
+| `controller_serial` | what the APK reported (`ro.serialno`) |
+| `vnnox_sn` | what we actually poll; defaults to `controller_serial`, superadmin-overridable |
+| `vnnox_sid` | VNNOX's numeric screen id, cached from `screen/list` |
+| `last_sync_at`, `last_error` | sync bookkeeping, surfaced in the CMS |
+
+`vnnox_sn` is separate from `controller_serial` because we do not yet know that the
+Taurus's Android serial equals VNNOX's SN. If they differ, an operator sets the
+override and nothing else changes.
+
+## Field mapping
+
+Everything below arrives in a single `POST /all` response; the standalone endpoints
+are the drill-down equivalents.
+
+| Target | Source | Field |
+|---|---|---|
+| `screen_health.controller_model` / `_firmware` | `master-control/basics` | `version`, `mac`, `status`, `timeZone` |
+| `screen_health.brightness_percent` | `screen/monitor` | `brightness`, `envBrightness` (`-1` = not read) |
+| `screen_health` resolution | `screen/monitor` | `width`, `height`, `displayDevice` (LED/LCD) |
+| `screen_panels` | `receiving-card/topology` | `topologys[].x/y/width/height`, `senderIndex`, `portIndex`, `connectIndex` |
+| `panel_readings.temperature_c` / `.voltages` | `receiving-card/monitor` | `temperature`, `voltage` |
+| `panel_readings.fan_rpm` / `.door_open` / `.smoke_alarm` | `monitor-card/monitor` | `fansSpeed{0..8}`, `cabinDoorStatus`, `smokeStatus`, `voltage{0..8}` |
+| `panel_readings.module_status` | `module/monitor`, `smart-module/monitor` | `icType`, `lineDecodingIc`, `scanNum`, `width`, `height` |
+| `panel_health` | `*/alarm` | `alarmType`, `level`, `alarmValue`, `position`, `createAt` |
+
+### Two field-name traps
+
+**The same boolean is named differently in the two endpoints:**
+
+* `receiving-card/monitor/{sn}` → `items[].deviceWorkState`
+* `POST /all` → `receivingCard.monitor[].status`
+
+Same meaning. The adapter reads both names; missing this would silently render
+every cabinet grey.
+
+**`-255` is a "no sensor fitted" sentinel** in `fansSpeed{0..8}` and
+`voltage{0..8}` — 9 sensor channels on **one** card, not 9 cabinets. Stored as
+NULL. Rendering it would paint a healthy wall with −255 V faults.
+
+## Cabinet state: composed, not read
+
+VNNOX's UI shows Normal / Faulty / Risky per cabinet, but **no endpoint returns a
+three-state field.** `deviceWorkState` is a boolean, which cannot express "Risky".
+VNNOX composes the colours from two endpoints and so do we:
+
+| State | Rule |
+|---|---|
+| `ok` (green) | present in `monitor`, `deviceWorkState: true`, no open alarm at that position |
+| `dark` (red) | `deviceWorkState: false` — **or** open alarm `level: 4` — **or** present in topology but **absent from `monitor`** |
+| `degraded` (yellow) | open alarm `level: 3` at that position |
+| `unknown` (grey) | VNNOX did not answer for this screen |
+
+**Topology is what makes a dead cabinet detectable at all.** `monitor` returns the
+cards that *answered*. A cabinet whose receiving card has died may simply not appear
+in the list rather than appearing with a false flag — read alone, a wall with a dead
+tile looks like a smaller, perfectly healthy wall. Topology is the expected set,
+`monitor` is the answering set, and the difference is dark.
+
+Which way the hardware actually behaves is unverified until a screen is bound, so
+the adapter treats absence and `false` identically. That costs nothing.
+
+### `dark` vs `degraded` is not cosmetic
+
+A disconnected receiving card is `dark`. A high-temperature or over-voltage alarm
+is `degraded` — the cabinet is still lighting up. This matters beyond colour:
+proof-of-play overlays discount only `dark` cabinets, so labelling a hot-but-working
+cabinet as dark would under-report delivered ads and cost real revenue.
+
+## Decoding `position`
+
+`position` is the join key between topology and alarms/readings, and the piece most
+likely to be got wrong. It lives in its own pure, unit-tested module.
+
+Four hex digits per group, `(deviceTypeCode, index)`, outermost first. Index is
+0-based; VNNOX displays it 1-based.
+
+Device types: `01` screen · `02` sending card · `03` Ethernet port ·
+`05` receiving card · `06` monitor card · `0C` smart module ·
+`0D`/`0E` smart-module x/y.
+
+Alarm positions append one more group whose codes are *physical quantities*:
+`00` voltage · `01` temperature · `04` fan speed · `05` smoke · `06` working status ·
+`07` input source · `09` cabinet door · `0B` flat cable · `0C` port redundancy ·
+`0E` hardware connection.
+
+So `0100 0200 0300 0501` renders as
+`Screen(No:1)–Sending card(No:1)–Ethernet port(No:1)–Receiving card(No:2)`, matching
+VNNOX's own Alarm History column exactly.
+
+## Sync
+
+`app/health/vendors/vnnox/`:
+
+* `client.py` — signed HTTP client; paces under 5/sec; honours `Retry-After` on 429
+  rather than a fixed backoff.
+* `position.py` — the decoder above. Pure functions, no I/O.
+* `adapter.py` — VNNOX JSON → the four tables. One function per subsystem.
+* `sync.py` — selects linked screens, batches by 10, calls `/all`, writes.
+
+Driven by `/api/cron/vnnox-health` every 5 minutes. Cron jobs run on
+**cron-job.org**, not GCP Cloud Scheduler (the API is disabled on the project) —
+this becomes the fourth such job.
+
+Two screens cost 12 requests/hour, roughly 1% of budget.
+
+## CMS surfaces
+
+Existing pages under `/screen-health`, extended to full parity with VNNOX Care:
+
+* **Fleet list** — health status per screen, plus a plain badge: `VNNOX Care` or
+  `Not monitored`.
+* **System overview** — Controller ● Normal (T1‑4G, 4.7.7.1601) → Screen ● Normal
+  (65%), resolution, and **VNNOX's own sync timestamp**, not our poll time. Their UI
+  warns of a synchronisation lag; showing our poll time would overstate freshness.
+* **Cabinet grid** — `[Status] [Temperature] [Voltage] [Modules]` tabs, laid out
+  from topology's real `x/y/width/height`.
+* **Cabinet drawer** — per-channel voltages, fan RPM, door, smoke, flat cable,
+  FPGA/MCU version.
+* **Alarm history** — filterable by part / type / level / status / date, location
+  rendered in words. Backed by `panel_health`, which already models the
+  open→resolved interval VNNOX shows as "Recover".
+* **Brightness history** — chart with `brightType` (0 manual, 1 scheduled,
+  2 automatic, 5 sensor read failed). Fetched on demand.
+
+The CMS renders `tier`, `tier_explanation` and `tabs` from the API and never
+re-derives capability rules; a second copy in TypeScript would drift.
+
+Screenowners see health for screens assigned to them, consistent with the existing
+permission model (screenowner = superadmin scoped to owned screens).
+
+### Correction to existing tier text
+
+`TIER_CONTROLLER`'s explanation currently says temperature and voltage require
+monitoring cards. Against VNNOX that is wrong: `receiving-card/monitor` returns
+temperature and voltage per card, which is why the Receiving Card view has those
+tabs on a wall with no monitoring cards fitted. Monitoring cards add fan speed,
+smoke, cabinet door and the 9-channel voltages. The wording is corrected.
+
+## Invariants
+
+* **`unknown` ≠ `ok`.** If VNNOX does not answer, cabinets go grey, not green. "We
+  cannot see the wall" and "the wall is fine" are opposite facts.
+* **Healthy writes nothing** to `panel_health` — that is what keeps it small.
+* **`observed_at` carries forward** across re-observations of the same state; it is
+  what "dark since Tuesday" reads. Only `last_seen_at` advances.
+* **Absent ≠ recovered.** A screen missing from a sync is unreachable, not fixed.
+* Overlay is applied **on read**, fail-open, and only for `dark`.
+
+## Testing
+
+Built against **recorded fixtures** taken from the documented example payloads, so
+the adapter, the position decoder and the state composition are all testable before
+any hardware exists. Per project convention, tests are written but not run by the
+agent (`ruff` is the gate; the user runs the suite).
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| Account mismatch — key cannot see the screens | Must be fixed externally; nothing verifies until then |
+| Taurus `ro.serialno` ≠ VNNOX SN | `vnnox_sn` override field; costs one form input |
+| Dead cabinet drops out of `monitor` rather than flagging false | Adapter treats absent and `false` identically |
+| Phase A/B stranded 49 commits behind `main` | Rebase first, as its own step; migration slot `0038` is free |
+| Camera endpoints unverified (500s) | Out of scope for v1 |
+
+## Phasing
+
+1. Rebase the Phase A/B health work from `dev` onto `main` in all three repos.
+2. Backend: client, position decoder, adapter, sync, cron, link table.
+3. APK: report `ro.serialno` in the heartbeat when running on a NovaStar box.
+4. CMS: extend the health pages to full parity.
+5. Saturday: verify against the real controller; confirm the serial matches and how
+   a dead cabinet actually presents.
