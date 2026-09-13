@@ -47,10 +47,13 @@
             └── SpikeAdmin.java             DeviceAdminReceiver
 ```
 
-Shorthand used in every remote step (run from the laptop):
+Shorthand used in every remote step (run from the laptop). It is a **function, not a string
+variable**: zsh — the default macOS shell — does not word-split an unquoted `$VAR`, so a
+`VMSSH='gcloud …'` variable would fail every step with "command not found". The keep-alive
+flags make a stalled IAP tunnel drop within ~30 s instead of hanging (macOS has no `timeout`).
 
 ```bash
-VMSSH='gcloud compute ssh headscale --project markai-499512 --zone us-central1-a --tunnel-through-iap --command'
+vmssh() { gcloud compute ssh headscale --project markai-499512 --zone us-central1-a --tunnel-through-iap --ssh-flag=-oServerAliveInterval=10 --ssh-flag=-oServerAliveCountMax=3 --command "$1"; }
 ```
 
 ---
@@ -573,7 +576,7 @@ Expected: both files transferred.
 - [ ] **Step 2: Install with `-t` (test-only) and confirm it is test-only**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555; adb connect $T >/dev/null; sleep 2;
+vmssh 'T=100.64.0.4:5555; adb connect $T >/dev/null; sleep 2;
   adb -s $T install -t -r /tmp/app-debug.apk;
   adb -s $T shell dumpsys package tech.markai.updaterspike | grep -E "flags=|nativeLibraryDir|legacyNativeLibraryDir"'
 ```
@@ -582,7 +585,7 @@ Expected: `Success`; a `flags=[ ... TEST_ONLY ... ]` line; a `nativeLibraryDir=`
 - [ ] **Step 3: Confirm the library file is on disk and executable**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555; D=$(adb -s $T shell dumpsys package tech.markai.updaterspike | grep -m1 -o "legacyNativeLibraryDir=[^ ]*" | cut -d= -f2 | tr -d "\r");
+vmssh 'T=100.64.0.4:5555; D=$(adb -s $T shell dumpsys package tech.markai.updaterspike | grep -m1 -o "legacyNativeLibraryDir=[^ ]*" | cut -d= -f2 | tr -d "\r");
   adb -s $T shell ls -l "$D/arm/libtailscaled.so" "$D/armeabi-v7a/libtailscaled.so" 2>&1'
 ```
 Expected: one of the two paths lists the file with `x` permission bits.
@@ -600,7 +603,7 @@ Expected: one of the two paths lists the file with `x` permission bits.
 - [ ] **Step 1: Mint a single-use 1-hour key and launch, without printing the key**
 
 ```bash
-$VMSSH 'set -e; T=100.64.0.4:5555;
+vmssh 'set -e; T=100.64.0.4:5555;
   K=$(sudo headscale preauthkeys create --user 1 --tags tag:player --expiration 1h -o json \
       | python3 -c "import sys,json; r=sys.stdin.read(); print(json.loads(r[r.find(\"{\"):])[\"key\"])");
   case "$K" in hskey-*) ;; *) echo "no key minted"; exit 1;; esac;
@@ -612,7 +615,7 @@ Expected: `launched`.
 - [ ] **Step 2: Wait 60 s, then read the app's own logs**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555; sleep 60;
+vmssh 'T=100.64.0.4:5555; sleep 60;
   for f in ts/up.exit ts/up.log error.log; do echo "== $f"; adb -s $T shell run-as tech.markai.updaterspike cat files/$f 2>&1 | tail -20; done;
   echo "== tailscaled.log (tail)"; adb -s $T shell run-as tech.markai.updaterspike tail -25 files/ts/tailscaled.log'
 ```
@@ -623,7 +626,7 @@ R2 FAIL signature: `tailscaled.log` contains `no such host` / `lookup headscale.
 - [ ] **Step 3: Confirm from Headscale's side**
 
 ```bash
-$VMSSH 'sudo headscale nodes list -o json | python3 -c "
+vmssh 'sudo headscale nodes list -o json | python3 -c "
 import sys,json; r=sys.stdin.read(); n=[x for x in json.loads(r[r.find(\"[\"):]) if x.get(\"given_name\")==\"updater-spike-favara\" or x.get(\"name\")==\"updater-spike-favara\"]
 print(\"FOUND\", n[0][\"id\"], n[0][\"ip_addresses\"], \"online=\", n[0].get(\"online\")) if n else print(\"NOT FOUND\")"'
 ```
@@ -642,14 +645,14 @@ Expected: `FOUND <id> ['100.64.0.N', ...] online= True`. Record the id and IPv4 
 
 ```bash
 SPIKE_IP=100.64.0.N   # the IPv4 recorded in Task 6
-$VMSSH "timeout 8 bash -c '</dev/tcp/$SPIKE_IP/5555' && echo OPEN || echo CLOSED"
+vmssh "timeout 8 bash -c '</dev/tcp/$SPIKE_IP/5555' && echo OPEN || echo CLOSED"
 ```
 Expected for PASS: `OPEN` — the connection entered the app's userspace tunnel and was forwarded to Favara's adbd.
 
 - [ ] **Step 2: Prove it is adb, not a stray listener**
 
 ```bash
-$VMSSH "adb connect $SPIKE_IP:5555; sleep 2; adb -s $SPIKE_IP:5555 shell getprop ro.product.model; adb disconnect $SPIKE_IP:5555"
+vmssh "adb connect $SPIKE_IP:5555; sleep 2; adb -s $SPIKE_IP:5555 shell getprop ro.product.model; adb disconnect $SPIKE_IP:5555"
 ```
 Expected: prints Favara's model (the same value `adb -s 100.64.0.4:5555 shell getprop ro.product.model` returns).
 
@@ -665,7 +668,7 @@ Expected: prints Favara's model (the same value `adb -s 100.64.0.4:5555 shell ge
 - [ ] **Step 1: Re-check preconditions and the test-only flag — stop on any mismatch**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555; S="adb -s $T shell";
+vmssh 'T=100.64.0.4:5555; S="adb -s $T shell";
   echo "accounts: $($S dumpsys account | grep -m1 "Accounts:" | tr -d "\r")";
   echo "users:    $($S pm list users | grep -c UserInfo)";
   echo "owner:    [$($S dumpsys device_policy | grep -i "Device Owner" | tr -d "\r")]";
@@ -676,14 +679,14 @@ Expected: `Accounts: 0`, `users: 1`, `owner: []` (empty), `testonly: 1` or more.
 - [ ] **Step 2: Make the spike app Device Owner**
 
 ```bash
-$VMSSH 'adb -s 100.64.0.4:5555 shell dpm set-device-owner tech.markai.updaterspike/.SpikeAdmin'
+vmssh 'adb -s 100.64.0.4:5555 shell dpm set-device-owner tech.markai.updaterspike/.SpikeAdmin'
 ```
 Expected: `Success: Device owner set to package ComponentInfo{tech.markai.updaterspike/tech.markai.updaterspike.SpikeAdmin}`
 
 - [ ] **Step 3: Put `hello.apk` in the app's private files**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555; adb -s $T push /tmp/hello-debug.apk /data/local/tmp/spike-hello.apk >/dev/null;
+vmssh 'T=100.64.0.4:5555; adb -s $T push /tmp/hello-debug.apk /data/local/tmp/spike-hello.apk >/dev/null;
   adb -s $T shell run-as tech.markai.updaterspike cp /data/local/tmp/spike-hello.apk files/hello.apk;
   adb -s $T shell run-as tech.markai.updaterspike ls -l files/hello.apk'
 ```
@@ -692,7 +695,7 @@ Expected: `files/hello.apk` listed with a non-zero size.
 - [ ] **Step 4: Trigger the install and capture the screen at the same moment**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555;
+vmssh 'T=100.64.0.4:5555;
   adb -s $T shell am start -n tech.markai.updaterspike/.SpikeActivity --es action install_hello >/dev/null;
   sleep 6; adb -s $T shell screencap -p /data/local/tmp/spike-during.png;
   sleep 10;
@@ -718,7 +721,7 @@ R3 FAIL signature: `PENDING_USER_ACTION`.
 - [ ] **Step 1: Kill the app process and start the tunnel again WITHOUT a key**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555;
+vmssh 'T=100.64.0.4:5555;
   adb -s $T shell am force-stop tech.markai.updaterspike;
   adb -s $T shell am start -n tech.markai.updaterspike/.SpikeActivity --es action tunnel_up --es authkey unused >/dev/null;
   sleep 45; adb -s $T shell run-as tech.markai.updaterspike tail -5 files/ts/tailscaled.log'
@@ -738,18 +741,18 @@ Re-run Task 6 Step 3. Expected: same node id, same IPv4 as recorded — proves t
 - [ ] **Step 1: Release Device Owner (only possible because the app is test-only)**
 
 ```bash
-$VMSSH 'adb -s 100.64.0.4:5555 shell dpm remove-active-admin tech.markai.updaterspike/.SpikeAdmin'
+vmssh 'adb -s 100.64.0.4:5555 shell dpm remove-active-admin tech.markai.updaterspike/.SpikeAdmin'
 ```
 Expected: `Success: Admin removed ...` (skip if Task 8 Step 2 never ran). Then:
 ```bash
-$VMSSH 'adb -s 100.64.0.4:5555 shell dumpsys device_policy | grep -i "Device Owner" || echo "no device owner"'
+vmssh 'adb -s 100.64.0.4:5555 shell dumpsys device_policy | grep -i "Device Owner" || echo "no device owner"'
 ```
 Expected: `no device owner`
 
 - [ ] **Step 2: Uninstall both spike packages and remove staged files**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555;
+vmssh 'T=100.64.0.4:5555;
   adb -s $T uninstall tech.markai.spikehello; adb -s $T uninstall tech.markai.updaterspike;
   adb -s $T shell rm -f /data/local/tmp/spike-hello.apk /data/local/tmp/spike-during.png;
   rm -f /tmp/app-debug.apk /tmp/hello-debug.apk /tmp/spike-during.png;
@@ -761,14 +764,14 @@ Expected: `spike packages gone`
 
 ```bash
 SPIKE_NODE_ID=N   # from Task 6
-$VMSSH "sudo headscale nodes delete --identifier $SPIKE_NODE_ID --force"
+vmssh "sudo headscale nodes delete --identifier $SPIKE_NODE_ID --force"
 ```
 Expected: node deleted; `sudo headscale nodes list` no longer shows `updater-spike-favara`.
 
 - [ ] **Step 4: Prove Favara is exactly as it was**
 
 ```bash
-$VMSSH 'T=100.64.0.4:5555;
+vmssh 'T=100.64.0.4:5555;
   echo "player: $(adb -s $T shell dumpsys package tech.markai.player | grep -m1 versionName | tr -d "\r")";
   echo "tailscale app: $(adb -s $T shell pm list packages com.tailscale.ipn | tr -d "\r")";
   sudo headscale nodes list -o json | python3 -c "
