@@ -45,6 +45,7 @@ markai-Web-cms  (Next.js dashboard — book ads, manage screens/users/API keys, 
 | `markai-signage-api/` | **NEW** FastAPI + Postgres backend. The brain. Serves the APK *and* the CMS. | Active, built & tested |
 | `markai-player-apk/` | **NEW** Kotlin Android signage player. Installed on ScreenOx screens. | Active, runs on emulator |
 | `markai-Web-cms/` | **NEW** Next.js admin CMS. Connects to `markai-signage-api`. | Active, built & runs |
+| `markai-cms-mobile/` | **NEW** CMS as a phone app (Kotlin Compose Multiplatform → Android APK + iOS). Same `/api/cms` endpoints and role rules as the web CMS; UI from the Claude Design "Mark AI Mobile App". See its `CLAUDE.md`. | Active, Android runs on emulator; iOS compiles, needs Xcode to run |
 | `markai-frontend/` | Pre-existing public **marketing website** (Next.js). Source of the brand logo. | Legacy / separate |
 | `markai-backend/` | Pre-existing **MongoDB** backend (FastAPI + pymongo). NOT used by the new system. | Legacy / separate |
 
