@@ -1,0 +1,51 @@
+/* ============================================================================
+   Creative Fit — tokens.
+
+   Deliberately the SAME "Signal · Control Room" palette as markai-Web-cms, so
+   this tool reads as part of Mark AI rather than a separate product. If the CMS
+   palette moves, move it here too.
+
+   Dark only: this is a tool for judging how a bright ad lands on a panel in a
+   dim café. A light chrome would fight the thing being looked at.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Brand primitives */
+  --brand-blue: #3b82f6;
+  --brand-blue-deep: #2c63c9;
+  --brand-teal: #1ec8c8;
+  --brand-green: #a8d11e;
+
+  /* Surfaces */
+  --bg: #0b0f17;
+  --bg-subtle: #0e131d;
+  --surface: #131a26;
+  --surface-raised: #182131;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Text */
+  --text: #e6eaf2;
+  --text-muted: #8a94a6;
+  --text-subtle: #5b6576;
+
+  /* Status — reused for the three fit modes */
+  --status-online: #a8d11e;
+  --status-warn: #f5a524;
+  --status-danger: #fb5e7e;
+
+  --focus-ring: rgba(30, 200, 200, 0.6);
+
+  /* The one live accent. Used once, on the hero rule. */
+  --signal: linear-gradient(
+    120deg,
+    var(--brand-blue-deep) 0%,
+    var(--brand-teal) 55%,
+    var(--brand-green) 100%
+  );
+
+  --radius-panel: 10px;
+  --radius-control: 8px;
+}

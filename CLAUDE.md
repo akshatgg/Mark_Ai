@@ -45,6 +45,7 @@ markai-Web-cms  (Next.js dashboard — book ads, manage screens/users/API keys, 
 | `markai-signage-api/` | **NEW** FastAPI + Postgres backend. The brain. Serves the APK *and* the CMS. | Active, built & tested |
 | `markai-player-apk/` | **NEW** Kotlin Android signage player. Installed on ScreenOx screens. | Active, runs on emulator |
 | `markai-Web-cms/` | **NEW** Next.js admin CMS. Connects to `markai-signage-api`. | Active, built & runs |
+| `markai-cms-mobile/` | **NEW** CMS as a phone app (Kotlin Compose Multiplatform → Android APK + iOS). Same `/api/cms` endpoints and role rules as the web CMS; UI from the Claude Design "Mark AI Mobile App". See its `CLAUDE.md`. | Active, Android runs on emulator; iOS compiles, needs Xcode to run |
 | `markai-frontend/` | Pre-existing public **marketing website** (Next.js). Source of the brand logo. | Legacy / separate |
 | `markai-backend/` | Pre-existing **MongoDB** backend (FastAPI + pymongo). NOT used by the new system. | Legacy / separate |
 
@@ -54,14 +55,19 @@ The new signage system is `markai-signage-api` + `markai-player-apk` + `markai-W
 ## How to run the new system locally
 1. **Backend** (needs Docker + Poetry):
    ```bash
-   cd markai-signage-api && cp .env.example .env && ./dev_start.sh   # Postgres :5433, API :8000
+   cd markai-signage-api && cp .env.example .env && ./dev_start.sh   # Postgres :5433, API :8095
    ```
-   Postgres host port is **5433** (5432 is taken on this machine).
+   Postgres host port is **5433** (5432 is taken on this machine), and the API
+   binds **8095** — `dev_start.sh` says so, `markai-Web-cms` and
+   `markai-studio-web` both point there, and the APK's `BASE_URL` uses it. This
+   line read `:8000` until 2026-08-31; a service pointed at 8000 fails with a
+   bare connection error that looks like a bug in the caller.
 2. **CMS**:
    ```bash
    cd markai-Web-cms && npm install && npm run dev                   # :5120
    ```
-   Log in at http://localhost:5120/login with **`superadmin` / `Admin@123`** (seeded).
+   Log in at http://localhost:5120/login with **`admin@mark-ai.tech` / `Admin@123`** (seeded).
+   CMS operators are identified by **email**, not a username (migration `0032`).
 3. **APK**: open `markai-player-apk` in Android Studio → run on an emulator/device.
    `BASE_URL` defaults to `http://10.0.2.2:8095` (emulator → host).
 
@@ -101,16 +107,29 @@ The CMS uses `/api/cms/*` (JWT login). External partners use `/api/ext/*` (API-k
   24/7), default **09:00–17:00**, set on registration and editable by the superadmin
   (any screen) or the owning screenowner — one at a time or in bulk. Inside the
   window ads play; outside it the screen shows black (the APK gates playback and
-  slows its heartbeat to a 15-min edge buffer). Advertisers can only book inside a
-  screen's hours (rejected 422 otherwise; a windowless booking inherits the screen's
-  hours). A silent screen outside hours reads `off_hours` (calm), not `offline`. We
-  do NOT power the panel off — the venue/hardware does that.
-- **The loop timing is OWNER-fixed, not client-set (important):** each screen has two
-  owner/superadmin fields — `slot_duration_seconds` (how long EVERY ad plays) and
-  `loop_duration_seconds` (when the loop restarts). Number of slots = loop ÷ slot. A client
-  booking can NOT set play duration; every ad (image *and* video) plays for the screen's slot
-  duration and repeats once per loop. (Earlier `min_display_seconds` on bookings was wrong and
-  is now ignored.)
+  slows its heartbeat to a keep-alive — every 15 min in production, 1 min in dev —
+  rather than going silent, so a change to a closed screen's hours can still reach it
+  on its next check-in; the CMS tells the operator when a closed screen will apply the
+  change). Advertisers can only book inside a screen's hours (rejected 422 otherwise; a
+  windowless booking inherits the screen's hours). A quiet screen outside hours reads
+  `off_hours` (calm), not `offline`. We do NOT power the panel off — the venue/hardware
+  does that.
+- **The loop is a GRID OF SLOTS, each with its own length (migration `0042`):** a screen
+  owns a contiguous list of slots (`screen_slots`) and **every slot can be a different
+  length**. A new screen gets **9 slots × 10s = a 90-second loop**; the loop length is
+  always the SUM of the slots, so stretching slot 2 from 10s to 15s makes the loop 95s on
+  its own — there is no separate loop number to keep in step. A screenowner (or superadmin)
+  edits any slot from the CMS screen page, including a slot an advertiser's campaign is
+  sitting in.
+  **The timing is still OWNER-controlled, never client-set:** an ad *occupies* a slot, and
+  the SLOT owns the seconds. A booking cannot ask for its own duration. (`min_display_seconds`
+  on bookings remains dead and ignored.) The CMS operator can now retime that slot from the
+  Scheduling side as well — the booking form and Edit campaign write the same `screen_slots`
+  row the screen page writes, because walking to the screen page to change one number was the
+  whole friction. Nothing on a booking carries seconds; the slot still owns them.
+  `screens.slot_duration_seconds` now means "the
+  default length for a new slot"; `loop_duration_seconds` and `slot_count` are mirrors of
+  the grid. An oversold screen grows its grid rather than rejecting a booking.
 - **Roles, no signup:** **superadmin / screenowner** (the old admin/user roles were removed).
   - superadmin: full control; creates more superadmins and screenowners; assigns which
     screens each screenowner may manage; books campaigns; manages API keys. Seeded on startup.

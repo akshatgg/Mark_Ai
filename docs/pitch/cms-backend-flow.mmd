@@ -1,0 +1,106 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Helvetica, Arial, sans-serif","fontSize":"18px","primaryTextColor":"#0B1420","lineColor":"#8296AA","clusterBkg":"#F7FAFC","clusterBorder":"#C7D4E1"},"flowchart":{"htmlLabels":false,"wrappingWidth":800,"curve":"basis","nodeSpacing":45,"rankSpacing":70,"padding":18}}}%%
+flowchart TB
+
+classDef gate  fill:#EDF2F7,stroke:#0B1420,stroke-width:1.4px,color:#0B1420
+classDef man   fill:#E7EEFE,stroke:#1D4ED8,stroke-width:1.4px,color:#153A9E
+classDef ai    fill:#DFF3EF,stroke:#0F766E,stroke-width:1.4px,color:#0A574F
+classDef part  fill:#FAEFDC,stroke:#96590A,stroke-width:1.4px,color:#6A3E05
+classDef core  fill:#E2F2E8,stroke:#15803D,stroke-width:1.4px,color:#0C5028
+classDef kill  fill:#FBE9E8,stroke:#B0201C,stroke-width:1.6px,color:#7E1512
+classDef keep  fill:#FFFFFF,stroke:#0B1420,stroke-width:2.4px,color:#0B1420
+classDef note  fill:#FFFFFF,stroke:#9AABBD,stroke-width:1px,stroke-dasharray:4 3,color:#3A4A5A,font-size:13px
+
+subgraph CMS["THE CMS"]
+direction TB
+  LG["Login"]
+
+  subgraph ROW1["ROW 1 · MANUAL"]
+  direction LR
+    UP["Upload"] --> SL["Select"] --> BK["Book"]
+  end
+
+  subgraph ROW2["ROW 2 · AI"]
+  direction LR
+    CH["Chat"] --> AGT["Agent"] --> TLS["Tools"] --> DF["Draft"] --> CN["Confirm"]
+  end
+
+  LG --> UP
+  LG --> CH
+  ROW1 ~~~ ROW2
+end
+
+subgraph API["API KEY · third party"]
+direction LR
+  KY["Key"] --> VR["Verify"]
+end
+
+subgraph BACK["BACKEND"]
+direction LR
+  CK["Check"] --> SV["Save"] --> NT["Notify"]
+end
+
+BK --> CK
+CN --> CK
+VR --> CK
+
+subgraph SCR["THE SCREEN"]
+direction LR
+  FT["Fetch"] --> PY["Play"]
+end
+NT --> FT
+
+subgraph PRF["PROOF OF PLAY · the numbers"]
+direction LR
+  SG["Sign"] --> SD["Send"] --> ST["Store"]
+end
+PY --> SG
+
+subgraph SHOT["SCREENSHOTS · the pictures"]
+direction LR
+  SNP["Snap"] --> SHW["Show"]
+end
+PY --> SNP
+
+subgraph BIL["BILLING"]
+direction LR
+  RP["Report"] --> FZ["Freeze"]
+  FZ --> DL["Delete"]
+  FZ --> KP["Keep"]
+end
+ST --> RP
+
+NA["Email + password. Two roles:<br/>superadmin sees all screens,<br/>screenowner sees only their own."]
+NA -.- LG
+
+N1["The operator does every step:<br/>upload the ad, pick the screen,<br/>set the dates, book it."]
+N1 -.- ROW1
+
+N2["Just describe the campaign in words.<br/>Runs on Google GEMINI 2.5 FLASH.<br/>The AGENT decides what to do; the TOOLS do it —<br/>find the screen, list your ads,<br/>check the ad fits that screen's size.<br/>It never saves on its own — you confirm."]
+N2 -.- ROW2
+
+N3["A partner platform books on our screens<br/>with a key + secret. Secret is shown once.<br/>Every booking is tagged back to them."]
+N3 -.- API
+
+N4["One engine for all three lanes:<br/>check it is allowed, save it,<br/>flag the screen to reload."]
+N4 -.- BACK
+
+N5["THE HEARTBEAT — every 60 s the screen checks in:<br/>I am alive, here is what I am playing, anything new?<br/>Yes → pull the new playlist and play it.<br/>The same beat also delivers screenshot requests.<br/>No live push, so it scales to any fleet size."]
+N5 -.- SCR
+
+N6["PROOF IS A SEPARATE CHANNEL — NOT THE HEARTBEAT<br/>Heartbeat = the 60 s check-in above.<br/>Proof = its own upload, ~60 s, 200 plays at a time.<br/>Offline screens keep playing and send later — nothing is lost.<br/>Every play is signed on the device, so it cannot be faked."]
+N6 -.- PRF
+
+N8["Two kinds, one pipeline:<br/>3 AUTOMATIC shots per campaign — start, middle, end — kept forever.<br/>CAPTURE NOW — click any time and the screen photographs<br/>your ad on its next real play.<br/>Never black, never the wrong ad: the shutter only fires<br/>while your ad is actually on the glass."]
+N8 -.- SHOT
+
+N7["Freeze = one final total per campaign = the bill.<br/>Delete = 30 DAYS LATER the raw play records go.<br/>Keep = the 3 proof screenshots stay forever."]
+N7 -.- BIL
+
+class LG gate
+class UP,SL,BK man
+class CH,AGT,TLS,DF,CN ai
+class KY,VR part
+class CK,SV,NT,FT,PY,SG,SD,ST,RP,FZ,SNP,SHW core
+class DL kill
+class KP keep
+class NA,N1,N2,N3,N4,N5,N6,N7,N8 note

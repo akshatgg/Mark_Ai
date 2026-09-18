@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+
+# Cached model weights (big-lama.pt ~200MB, u2net.onnx ~176MB) and per-creative
+# artifacts. Both are reproducible — never commit them.
+.models/
+.work/

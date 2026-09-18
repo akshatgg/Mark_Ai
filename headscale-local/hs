@@ -1,0 +1,48 @@
+#!/bin/bash
+# hs — run headscale commands on the GCP control server without typing the
+# gcloud ssh incantation every time.
+#
+#   ./hs nodes list
+#   ./hs key                     (shortcut: mint a reusable tagged fleet key)
+#   ./hs preauthkeys list
+#   ./hs nodes delete -i 3 --force
+#
+# Headscale has no web UI by design — this is the management surface.
+set -euo pipefail
+
+ZONE="us-central1-a"
+PROJECT="markai-499512"
+VM="headscale"
+
+run() {
+  gcloud compute ssh "$VM" --zone="$ZONE" --project="$PROJECT" --tunnel-through-iap \
+    --command="sudo headscale $*" 2>/dev/null
+}
+
+case "${1:-}" in
+  key)
+    # A screen's key must be reusable (so one key provisions the whole fleet) and
+    # tagged (tagged nodes are exempt from expiry — that is what stops a screen in
+    # a cafe silently dropping off the network months later).
+    echo "Minting a fleet key — copy it now, 'preauthkeys list' masks it forever:"
+    run preauthkeys create --user 1 --reusable --tags tag:player --expiration 99y
+    ;;
+  ips)
+    # headscale emits `null`, not `[]`, when no node is enrolled.
+    run nodes list -o json | python3 -c "
+import json,sys
+nodes = json.load(sys.stdin) or []
+if not nodes:
+    print('no screens enrolled yet')
+for n in nodes:
+    print(f\"{n.get('given_name','?'):24} {n['ip_addresses'][0]:15} {'online' if n.get('online') else 'OFFLINE'}\")
+"
+    ;;
+  "")
+    echo "usage: ./hs <headscale command>   |   ./hs key   |   ./hs ips"
+    echo "e.g.   ./hs nodes list"
+    ;;
+  *)
+    run "$@"
+    ;;
+esac
