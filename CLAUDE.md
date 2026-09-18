@@ -45,6 +45,7 @@ markai-Web-cms  (Next.js dashboard — book ads, manage screens/users/API keys, 
 | `markai-signage-api/` | **NEW** FastAPI + Postgres backend. The brain. Serves the APK *and* the CMS. | Active, built & tested |
 | `markai-player-apk/` | **NEW** Kotlin Android signage player. Installed on ScreenOx screens. | Active, runs on emulator |
 | `markai-Web-cms/` | **NEW** Next.js admin CMS. Connects to `markai-signage-api`. | Active, built & runs |
+| `markai-cms-mobile/` | **NEW** CMS as a phone app (Kotlin Compose Multiplatform → Android APK + iOS). Same `/api/cms` endpoints and role rules as the web CMS; UI from the Claude Design "Mark AI Mobile App". See its `CLAUDE.md`. | Active, Android runs on emulator; iOS compiles, needs Xcode to run |
 | `markai-frontend/` | Pre-existing public **marketing website** (Next.js). Source of the brand logo. | Legacy / separate |
 | `markai-backend/` | Pre-existing **MongoDB** backend (FastAPI + pymongo). NOT used by the new system. | Legacy / separate |
 
@@ -122,7 +123,11 @@ The CMS uses `/api/cms/*` (JWT login). External partners use `/api/ext/*` (API-k
   sitting in.
   **The timing is still OWNER-controlled, never client-set:** an ad *occupies* a slot, and
   the SLOT owns the seconds. A booking cannot ask for its own duration. (`min_display_seconds`
-  on bookings remains dead and ignored.) `screens.slot_duration_seconds` now means "the
+  on bookings remains dead and ignored.) The CMS operator can now retime that slot from the
+  Scheduling side as well — the booking form and Edit campaign write the same `screen_slots`
+  row the screen page writes, because walking to the screen page to change one number was the
+  whole friction. Nothing on a booking carries seconds; the slot still owns them.
+  `screens.slot_duration_seconds` now means "the
   default length for a new slot"; `loop_duration_seconds` and `slot_count` are mirrors of
   the grid. An oversold screen grows its grid rather than rejecting a booking.
 - **Roles, no signup:** **superadmin / screenowner** (the old admin/user roles were removed).
